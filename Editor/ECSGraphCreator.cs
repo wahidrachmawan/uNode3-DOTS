@@ -62,42 +62,6 @@ namespace MaxyGames.UNode.Editors {
 		}
 	}
 
-	class AspectScriptGraphCreator : ClassGraphCreator {
-		public override string menuName => "DOTS/Aspect";
-
-		public AspectScriptGraphCreator() {
-			graphUsingNamespaces = new List<string>() {
-				"Unity.Burst",
-				"Unity.Entities",
-				"Unity.Transforms",
-				"Unity.Mathematics",
-				"Unity.Collections",
-			};
-			graphInterfaces = new List<SerializedType>() {
-				typeof(IAspect),
-			};
-		}
-
-		public override void OnGUI() {
-			base.OnGUI();
-			DrawGraphLayout();
-		}
-
-		protected override IScriptGraphType CreateScriptGraphType() {
-			var graph = ScriptableObject.CreateInstance<ClassScript>();
-			graph.modifier = new ClassModifier() {
-				Partial = true,
-				ReadOnly = true,
-			};
-			graph.inheritType = typeof(ValueType);
-			graph.interfaces = graphInterfaces;
-			graph.GraphData.graphLayout = graphLayout;
-			return graph;
-		}
-	}
-
-
-
 	class ComponentScriptGraphCreator : ClassGraphCreator {
 		enum ComponentKind {
 			Component,

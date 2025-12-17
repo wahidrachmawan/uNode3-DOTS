@@ -26,9 +26,6 @@ namespace MaxyGames.UNode.Editors {
 					if(type.HasImplementInterface(typeof(Unity.Entities.ISharedComponentData))) {
 						return true;
 					}
-					if(type.HasImplementInterface(typeof(Unity.Entities.IAspect))) {
-						return true;
-					}
 				}
 				return false;
 			};
