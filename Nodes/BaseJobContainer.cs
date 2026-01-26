@@ -7,7 +7,7 @@ using Unity.Burst;
 using Unity.Entities;
 
 namespace MaxyGames.UNode.Nodes {
-    public abstract class BaseJobNode : BaseEntryNode, ISuperNodeWithEntry, INodeEntitiesForeach {
+	public abstract class BaseJobContainer : NodeContainerWithEntry, IEventGraphCanvas, INodeEntitiesForeach {
 		public class VData {
 			public string id = uNodeUtility.GenerateUID();
 
@@ -25,38 +25,26 @@ namespace MaxyGames.UNode.Nodes {
 			}
 		}
 
-		[SerializeField]
-		protected NodeObject entryObject;
-		public BaseEntryNode Entry {
-			get {
-				if(this == null) return null;
-				if(entryObject == null || entryObject.node is not NestedEntryNode) {
-					nodeObject.AddChild(entryObject = new NodeObject(new NestedEntryNode()));
-				}
-				return entryObject.node as BaseEntryNode;
-			}
-		}
-
 		public List<ECSJobVariable> JobVariables {
 			get {
-				var result = CG.GetUserObject<List<ECSJobVariable>>(nodeObject);
+				var result = CG.GetUserObject<List<ECSJobVariable>>(this, "var");
 				if(result == null) {
 					result = new List<ECSJobVariable>();
-					CG.RegisterUserObject(result, nodeObject);
+					CG.RegisterUserObject(result, this, "var");
 				}
 				return result;
 			}
 		}
 
-		public virtual void RegisterEntry(NestedEntryNode node) {
+		public virtual string Title => name;
+
+		public const string Scope = "ECS_Job";
+
+		public override void RegisterEntry(BaseEntryNode node) {
 			for(int i = 0; i < variableDatas.Count; i++) {
 				var data = variableDatas[i];
 				data.port = Node.Utilities.ValueOutput(node, data.id, () => data.type).SetName(data.name);
 			}
-		}
-
-		public bool AllowCoroutine() {
-			return false;
 		}
 	}
 }

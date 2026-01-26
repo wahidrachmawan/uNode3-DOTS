@@ -15,7 +15,7 @@ namespace MaxyGames.UNode.Editors {
 		void OnEnable() {
 			var root = rootVisualElement;
 			var compileButton = new Button(() => {
-				SystemCompiler.CompileAllCSX();
+				SystemCompiler.GenerateAndCompileGraphs();
 			}) { text = "Compile + Reload" };
 
 			listView = new ListView {
@@ -30,16 +30,23 @@ namespace MaxyGames.UNode.Editors {
 			root.Add(compileButton);
 			root.Add(new Button(() => {
 				HotReloadSystemManager.InjectSystems();
+				listView.RefreshItems();
 			}) { text = "Inject Systems (Manual)" });
 			root.Add(new Button(() => {
 				HotReloadSystemManager.UninjectSystems();
+				listView.RefreshItems();
 			}) { text = "UnInject Systems (Manual)" });
+
 			root.Add(new Label("Active Systems:"));
 			root.Add(listView);
-		}
-
-		void Update() {
 			listView.RefreshItems();
+
+			var spacer = new VisualElement();
+			spacer.style.flexGrow = 1;
+			root.Add(spacer);
+			root.Add(new Button(() => {
+				listView.RefreshItems();
+			}) { text = "Refresh" });
 		}
 	}
 }

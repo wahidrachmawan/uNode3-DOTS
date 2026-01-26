@@ -6,9 +6,10 @@ using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Entities;
 
+[assembly: MakeSerializable(typeof(MaxyGames.UNode.Nodes.IJobEntityContainer))]
 namespace MaxyGames.UNode.Nodes {
-	[NodeMenu("ECS", "Create IJobEntity", nodeName = "MyJob", scope = NodeScope.ECSGraph, icon = typeof(TypeIcons.RuntimeTypeIcon))]
-	public class CreateIJobEntity : BaseJobNode, ISuperNodeWithEntry, IGeneratorPrePostInitializer {
+	[EventGraph("IJobEntity", createName = "newJob")]
+	public class IJobEntityContainer : BaseJobContainer, ISuperNodeWithEntry, IGeneratorPrePostInitializer, IErrorCheck {
 		public enum DataKind {
 			ReadOnly,
 			ReadWrite,
@@ -32,23 +33,16 @@ namespace MaxyGames.UNode.Nodes {
 		}
 		public List<Data> datas = new List<Data>() { new Data() };
 
+		public List<ECSQueryFilter> queryFilters = new List<ECSQueryFilter>();
+
 		public bool burstCompile = true;
 		public EntityQueryOptions options = EntityQueryOptions.Default;
 		public IndexKind indexKind;
 
-		public List<SerializedType> withAll = new List<SerializedType>();
-		public List<SerializedType> withAny = new List<SerializedType>();
-		public List<SerializedType> withNone = new List<SerializedType>();
-		public List<SerializedType> withChangeFilter = new List<SerializedType>();
-
 		public ValueOutput entity { get; private set; }
 		public ValueOutput index { get; private set; }
 
-		public override string GetTitle() {
-			return "Create Job: " + name;
-		}
-
-		public override void RegisterEntry(NestedEntryNode node) {
+		public override void RegisterEntry(BaseEntryNode node) {
 			base.RegisterEntry(node);
 
 			entity = Node.Utilities.ValueOutput(node, nameof(entity), typeof(Entity), PortAccessibility.ReadOnly);
@@ -76,13 +70,9 @@ namespace MaxyGames.UNode.Nodes {
 			}
 		}
 
-		protected override void OnRegister() {
-			Entry.Register();
-		}
-
 		public void OnPreInitializer() {
 			//Ensure this node is registered
-			this.EnsureRegistered();
+			Entry.EnsureRegistered();
 			//Manual register the entry node.
 			CG.RegisterDependency(entryObject);
 			//Initialize the class name
@@ -184,19 +174,50 @@ namespace MaxyGames.UNode.Nodes {
 				//Generate code for execute logic
 				method.code = CG.GeneratePort(Entry.nodeObject.primaryFlowOutput);
 
-				//Filters
-				if(withAll.Count > 0) {
-					classBuilder.RegisterAttribute(typeof(WithAllAttribute), withAll.Select(item => CG.Value(item.type)).ToArray());
+				foreach(var q in queryFilters) {
+					switch(q.filter) {
+						case QueryFilter.WithAll:
+							classBuilder.RegisterAttribute(typeof(WithAllAttribute), CG.Value(q.type));
+							break;
+						case QueryFilter.WithAny:
+							classBuilder.RegisterAttribute(typeof(WithAnyAttribute), CG.Value(q.type));
+							break;
+						case QueryFilter.WithNone:
+							classBuilder.RegisterAttribute(typeof(WithNoneAttribute), CG.Value(q.type));
+							break;
+						case QueryFilter.WithChangeFilter:
+							classBuilder.RegisterAttribute(typeof(WithChangeFilterAttribute), CG.Value(q.type));
+							break;
+						case QueryFilter.WithAbsent:
+							classBuilder.RegisterAttribute(typeof(WithAbsentAttribute), CG.Value(q.type));
+							break;
+						case QueryFilter.WithDisabled:
+							classBuilder.RegisterAttribute(typeof(WithDisabledAttribute), CG.Value(q.type));
+							break;
+						case QueryFilter.WithPresent:
+							classBuilder.RegisterAttribute(typeof(WithPresentAttribute), CG.Value(q.type));
+							break;
+					}
 				}
-				if(withAny.Count > 0) {
-					classBuilder.RegisterAttribute(typeof(WithAnyAttribute), withAny.Select(item => CG.Value(item.type)).ToArray());
-				}
-				if(withNone.Count > 0) {
-					classBuilder.RegisterAttribute(typeof(WithNoneAttribute), withNone.Select(item => CG.Value(item.type)).ToArray());
-				}
-				if(withChangeFilter.Count > 0) {
-					classBuilder.RegisterAttribute(typeof(WithChangeFilterAttribute), withChangeFilter.Select(item => CG.Value(item.type)).ToArray());
-				}
+
+				//var withAll = queryFilters.Where(item => item.filter == QueryFilter.WithAll).ToList();
+				//var withAny = queryFilters.Where(item => item.filter == QueryFilter.WithAny).ToList();
+				//var withNone = queryFilters.Where(item => item.filter == QueryFilter.WithNone).ToList();
+				//var withChangeFilter = queryFilters.Where(item => item.filter == QueryFilter.WithChangeFilter).ToList();
+
+				////Filters
+				//if(withAll.Count > 0) {
+				//	classBuilder.RegisterAttribute(typeof(WithAllAttribute), withAll.Select(item => CG.Value(item.type)).ToArray());
+				//}
+				//if(withAny.Count > 0) {
+				//	classBuilder.RegisterAttribute(typeof(WithAnyAttribute), withAny.Select(item => CG.Value(item.type)).ToArray());
+				//}
+				//if(withNone.Count > 0) {
+				//	classBuilder.RegisterAttribute(typeof(WithNoneAttribute), withNone.Select(item => CG.Value(item.type)).ToArray());
+				//}
+				//if(withChangeFilter.Count > 0) {
+				//	classBuilder.RegisterAttribute(typeof(WithChangeFilterAttribute), withChangeFilter.Select(item => CG.Value(item.type)).ToArray());
+				//}
 				if(options != EntityQueryOptions.Default) {
 					classBuilder.RegisterAttribute(typeof(WithOptionsAttribute), options.CGValue());
 				}
@@ -207,19 +228,27 @@ namespace MaxyGames.UNode.Nodes {
 				classData.RegisterNestedType(CG.WrapWithInformation(classBuilder.GenerateCode(), this));
 			});
 		}
+
+		void IErrorCheck.CheckError(ErrorAnalyzer analizer) {
+			for(int i = 0; i < datas.Count; i++) {
+				if(datas[i].type.type?.IsInterface == true) {
+					analizer.RegisterError(this, "Please assign correct query type of IComponentData.");
+					return;
+				}
+			}
+		}
 	}
 }
 
 #if UNITY_EDITOR
 namespace MaxyGames.UNode.Editors {
 	using UnityEditor;
-	using UnityEditor.Experimental.GraphView;
 	using UnityEngine.UIElements;
 
-	class CreateIJobEntityDrawer : NodeDrawer<Nodes.CreateIJobEntity> {
+	class IJobEntityContainerDrawer : UGraphElementDrawer<Nodes.IJobEntityContainer> {
 		static readonly FilterAttribute componentFilter;
 
-		static CreateIJobEntityDrawer() {
+		static IJobEntityContainerDrawer() {
 			componentFilter = new FilterAttribute(typeof(IComponentData), typeof(IQueryTypeParameter)) {
 				DisplayInterfaceType = false,
 				DisplayReferenceType = true,
@@ -228,7 +257,9 @@ namespace MaxyGames.UNode.Editors {
 		}
 
 		public override void DrawLayouted(DrawerOption option) {
-			var node = GetNode(option);
+			var node = GetValue(option);
+
+			DrawHeader(option);
 
 			UInspector.Draw(option.property[nameof(node.burstCompile)]);
 			UInspector.Draw(option.property[nameof(node.options)]);
@@ -240,29 +271,29 @@ namespace MaxyGames.UNode.Editors {
 					var portName = EditorGUI.DelayedTextField(position, new GUIContent("Name "), value.name);
 					if(portName != value.name) {
 						value.name = portName;
-						node.Register();
+						node.Entry.Register();
 						uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
 						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
 					}
 					position.y += EditorGUIUtility.singleLineHeight + 1;
 					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Type"), type => {
 						value.type = type;
-						node.Register();
+						node.Entry.Register();
 						uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
 						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
 					}, FilterAttribute.DefaultTypeFilter, option.unityObject);
 				},
 				add: position => {
 					option.RegisterUndo();
-					node.variableDatas.Add(new Nodes.CreateIJobEntity.VData());
-					node.Register();
+					node.variableDatas.Add(new ());
+					node.Entry.Register();
 					uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
 					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
 				},
 				remove: index => {
 					option.RegisterUndo();
 					node.variableDatas.RemoveAt(index);
-					node.Register();
+					node.Entry.Register();
 					uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
 					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
 				},
@@ -276,7 +307,7 @@ namespace MaxyGames.UNode.Editors {
 					var portName = EditorGUI.DelayedTextField(position, new GUIContent("Item " + index), value.name);
 					if(portName != value.name) {
 						value.name = portName;
-						node.Register();
+						node.Entry.Register();
 						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
 						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
 					}
@@ -284,37 +315,37 @@ namespace MaxyGames.UNode.Editors {
 					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Type"), type => {
 						value.type = type;
 						if(type.HasImplementInterface(typeof(IComponentData))) {
-							if(value.kind == Nodes.CreateIJobEntity.DataKind.None) {
-								value.kind = Nodes.CreateIJobEntity.DataKind.ReadWrite;
+							if(value.kind == Nodes.IJobEntityContainer.DataKind.None) {
+								value.kind = Nodes.IJobEntityContainer.DataKind.ReadWrite;
 							}
 						}
 						else {
-							value.kind = Nodes.CreateIJobEntity.DataKind.None;
+							value.kind = Nodes.IJobEntityContainer.DataKind.None;
 						}
-						node.Register();
+						node.Entry.Register();
 						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
 						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
 					}, componentFilter, option.unityObject);
 					position.y += EditorGUIUtility.singleLineHeight + 1;
 					uNodeGUIUtility.EditValue(position, new GUIContent("Accessibility"), value.kind, (val) => {
 						value.kind = val;
-						if(value.kind == Nodes.CreateIJobEntity.DataKind.None && value.type.type.HasImplementInterface(typeof(IComponentData))) {
-							value.kind = Nodes.CreateIJobEntity.DataKind.ReadWrite;
+						if(value.kind == Nodes.IJobEntityContainer.DataKind.None && value.type.type.HasImplementInterface(typeof(IComponentData))) {
+							value.kind = Nodes.IJobEntityContainer.DataKind.ReadWrite;
 						}
-						node.Register();
+						node.Entry.Register();
 					});
 				},
 				add: position => {
 					option.RegisterUndo();
-					node.datas.Add(new Nodes.CreateIJobEntity.Data());
-					node.Register();
+					node.datas.Add(new ());
+					node.Entry.Register();
 					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
 					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
 				},
 				remove: index => {
 					option.RegisterUndo();
 					node.datas.RemoveAt(index);
-					node.Register();
+					node.Entry.Register();
 					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
 					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
 				},
@@ -322,65 +353,43 @@ namespace MaxyGames.UNode.Editors {
 					return (EditorGUIUtility.singleLineHeight * 3) + 3;
 				});
 
-			uNodeGUI.DrawTypeList("With All", node.withAll, componentFilter, node.GetUnityObject());
-			uNodeGUI.DrawTypeList("With Any", node.withAny, componentFilter, node.GetUnityObject());
-			uNodeGUI.DrawTypeList("With None", node.withNone, componentFilter, node.GetUnityObject());
-			uNodeGUI.DrawTypeList("With Change Filter", node.withChangeFilter, componentFilter, node.GetUnityObject());
+			uNodeGUI.DrawCustomList(node.queryFilters, "Query Filters",
+				drawElement: (position, index, value) => {
+					position.height = EditorGUIUtility.singleLineHeight;
+					var filter = (QueryFilter)EditorGUI.EnumPopup(position, new GUIContent("Filter " + index), value.filter);
+					if(filter != value.filter) {
+						value.filter = filter;
+						node.Entry.Register();
+						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
+						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					}
+					position.y += EditorGUIUtility.singleLineHeight + 1;
+					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Component Type"), type => {
+						value.type = type;
+						node.Entry.Register();
+						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
+						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					}, componentFilter, option.unityObject);
+				},
+				add: position => {
+					option.RegisterUndo();
+					node.queryFilters.Add(new());
+					node.Entry.Register();
+					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
+					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+				},
+				remove: index => {
+					option.RegisterUndo();
+					node.queryFilters.RemoveAt(index);
+					node.Entry.Register();
+					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
+					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+				},
+				elementHeight: index => {
+					return (EditorGUIUtility.singleLineHeight * 2) + 3;
+				});
 
 			DrawErrors(option);
-		}
-	}
-
-	[NodeCustomEditor(typeof(Nodes.CreateIJobEntity))]
-	class CreateIJobEntityView : BaseNodeView {
-		protected override void OnReloadView() {
-			base.OnReloadView();
-			var node = targetNode;
-			{
-				var element = new Button();
-				element.text = "Create Run";
-				AddControl(Direction.Input, element);
-				element.clickable.clickedWithEventInfo += (evt) => {
-					NodeEditorUtility.AddNewNode<Nodes.JobEntityExecutor>(node.nodeObject.parent, node.position.position, n => {
-						n.runWith = Nodes.JobEntityExecutor.RunWith.Run;
-						n.ReferenceNode = node as Nodes.BaseJobNode;
-						//For refreshing the graph editor
-						uNodeGUIUtility.GUIChanged(node.GetUnityObject(), UIChangeType.Important);
-					});
-				};
-			}
-			{
-				var element = new Button();
-				element.text = "Create Schedule";
-				AddControl(Direction.Input, element);
-				element.clickable.clickedWithEventInfo += (evt) => {
-					NodeEditorUtility.AddNewNode<Nodes.JobEntityExecutor>(node.nodeObject.parent, node.position.position, n => {
-						n.runWith = Nodes.JobEntityExecutor.RunWith.Schedule;
-						n.ReferenceNode = node as Nodes.BaseJobNode;
-						//For refreshing the graph editor
-						uNodeGUIUtility.GUIChanged(node.GetUnityObject(), UIChangeType.Important);
-					});
-				};
-			}
-			{
-				var element = new Button();
-				element.text = "Create ScheduleParallel";
-				AddControl(Direction.Input, element);
-				element.clickable.clickedWithEventInfo += (evt) => {
-					NodeEditorUtility.AddNewNode<Nodes.JobEntityExecutor>(node.nodeObject.parent, node.position.position, n => {
-						n.runWith = Nodes.JobEntityExecutor.RunWith.ScheduleParallel;
-						n.ReferenceNode = node as Nodes.BaseJobNode;
-						//For refreshing the graph editor
-						uNodeGUIUtility.GUIChanged(node.GetUnityObject(), UIChangeType.Important);
-					});
-				};
-			}
-		}
-
-		public override void ReloadView() {
-			base.ReloadView();
-			border.EnableInClassList(ussClassBorderFlowNode, true);
-			border.EnableInClassList(ussClassBorderOnlyInput, true);
 		}
 	}
 }

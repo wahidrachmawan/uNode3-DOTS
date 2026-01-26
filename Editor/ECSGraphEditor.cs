@@ -63,7 +63,7 @@ namespace MaxyGames.UNode.Editors {
 				}, inheritFilter, asset);
 			}
 			else {
-				uNodeGUIUtility.ShowField(nameof(asset.burstCompile), asset, asset);
+				//uNodeGUIUtility.ShowField(nameof(asset.burstCompile), asset, asset);
 			}
 
 			uNodeGUI.DrawTypeList("Required For Updates", asset.requiredForUpdates, typeFilter, target);

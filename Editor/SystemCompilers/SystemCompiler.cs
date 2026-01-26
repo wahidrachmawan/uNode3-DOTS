@@ -7,7 +7,6 @@ using MaxyGames.UNode;
 using MaxyGames.UNode.Editors;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using NUnit.Framework;
 using Unity.CompilationPipeline.Common.ILPostProcessing;
 using UnityEditor;
 using UnityEditor.Compilation;
@@ -23,22 +22,10 @@ namespace MaxyGames.UNode.Editors {
 
 		internal static bool useAssemblyBuilder = true;
 
-		public static void CompileAllCSX() {
-			string fullPath = Path.Combine(Directory.GetCurrentDirectory(), CSXPath);
-			string[] csxFiles = Directory.GetFiles(fullPath, "*.csx", SearchOption.AllDirectories);
-
-			if(csxFiles.Length == 0) {
-				Debug.LogWarning("No .csx files found.");
-				return;
-			}
-			CompileScripts(csxFiles, success => {
-				if(success) {
-					Debug.Log("All .csx files compiled successfully.");
-				}
-				else {
-					Debug.LogError("Failed to compile .csx files.");
-				}
-			});
+		public static void GenerateAndCompileGraphs() {
+			var graphs = GraphUtility.FindAllGraphAssets().Where(obj => obj.GetType().FullName == "MaxyGames.UNode.ECSGraph").ToArray();
+			var scripts = GenerationUtility.GenerateScriptForGraphs(graphs, "ECS_System");
+			CompileScripts(scripts.Select(s => GenerationUtility.GetGraphData(s.graphOwner).path).ToArray());
 		}
 
 		public static void CompileScripts(string[] scriptPaths, Action<bool> callback = null) {
@@ -101,6 +88,24 @@ namespace MaxyGames.UNode.Editors {
 				}
 			}
 		}
+
+		//public static void CompileAllCSX() {
+		//	string fullPath = Path.Combine(Directory.GetCurrentDirectory(), CSXPath);
+		//	string[] csxFiles = Directory.GetFiles(fullPath, "*.csx", SearchOption.AllDirectories);
+
+		//	if(csxFiles.Length == 0) {
+		//		Debug.LogWarning("No .csx files found.");
+		//		return;
+		//	}
+		//	CompileScripts(csxFiles, success => {
+		//		if(success) {
+		//			Debug.Log("All .csx files compiled successfully.");
+		//		}
+		//		else {
+		//			Debug.LogError("Failed to compile .csx files.");
+		//		}
+		//	});
+		//}
 
 		static void RunILPP(string path, out byte[] rawAssembly, out byte[] rawPdb) {
 			rawAssembly = null;

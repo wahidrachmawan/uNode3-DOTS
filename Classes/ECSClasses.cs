@@ -18,6 +18,21 @@ namespace MaxyGames.UNode {
 		}
 	}
 
+	public enum QueryFilter {
+		WithAll = 0,
+		WithAny = 1,
+		WithNone = 2,
+		WithChangeFilter = 3,
+		WithAbsent = 4,
+		WithDisabled = 5,
+		WithPresent = 6,
+	}
+
+	public class ECSQueryFilter {
+		public QueryFilter filter;
+		public SerializedType type = typeof(IComponentData);
+	}
+
 	public interface IECSNode {
 
 	}

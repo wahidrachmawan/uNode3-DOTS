@@ -14,14 +14,15 @@ namespace MaxyGames.UNode {
 		supportModifier = true,
 		supportGeneric = false,
 		allowAutoCompile = false,
-		isScriptGraph = true)]
-	public class ECSGraph : GraphAsset, IClassGraph, IClassModifier, IGraphWithVariables, IGraphWithProperties, IGraphWithFunctions, IGraphWithAttributes, INamespaceSystem, ICustomMainGraph, IGeneratorPrePostInitializer {
+		isScriptGraph = true,
+		generationKind = GenerationKind.Compatibility)]
+	public class ECSGraph : GraphAsset, IClassGraph, IClassModifier, IGraphWithVariables, IGraphWithProperties, IGraphWithFunctions, IGraphWithAttributes, INamespaceSystem, ICustomMainGraph, IGraphWithEventGraph, IGeneratorPrePostInitializer {
 		public string @namespace;
 		public List<string> usingNamespaces = new List<string>() { "Unity.Burst", "Unity.Entities", "Unity.Transforms", "Unity.Mathematics" };
 		public ClassModifier modifier = new ClassModifier() { Partial = true };
 		public SerializedType inheritType = typeof(ValueType);
 
-		public bool burstCompile = true;
+		//public bool burstCompile = true;
 		public List<SerializedType> requiredForUpdates = new List<SerializedType>();
 
 		[HideInInspector, SerializeField]
@@ -80,6 +81,13 @@ namespace MaxyGames.UNode {
 				}
 			}
 		}
+
+		private static readonly HashSet<string> m_supportedEventGraph = new() {
+			"ECS_System",
+			"IJobEntity",
+			"IJobChunk"
+		};
+		HashSet<string> IGraphWithEventGraph.SupportedEventGraphs => m_supportedEventGraph;
 
 		void IGeneratorPrePostInitializer.OnPreInitializer() {
 			//Ensure the type is partial
@@ -186,18 +194,18 @@ namespace MaxyGames.UNode {
 				}
 			}
 
-			if(IsISystem && burstCompile && !CG.debugScript) {
-				onCreate.RegisterAttribute(typeof(BurstCompileAttribute));
-				onUpdate.RegisterAttribute(typeof(BurstCompileAttribute));
-				onDestroy.RegisterAttribute(typeof(BurstCompileAttribute));
-			}
+			//if(IsISystem && burstCompile && !CG.debugScript) {
+			//	onCreate.RegisterAttribute(typeof(BurstCompileAttribute));
+			//	onUpdate.RegisterAttribute(typeof(BurstCompileAttribute));
+			//	onDestroy.RegisterAttribute(typeof(BurstCompileAttribute));
+			//}
 
 			//Post generations
 			CG.RegisterPostGeneration((classData) => {
 				if(IsISystem) {
-					if(burstCompile && !CG.debugScript && GraphData.attributes.Any(a => a.type == typeof(BurstCompileAttribute)) == false) {
-						classData.RegisterAttribute(typeof(BurstCompileAttribute));
-					}
+					//if(burstCompile && !CG.debugScript && GraphData.attributes.Any(a => a.type == typeof(BurstCompileAttribute)) == false) {
+					//	classData.RegisterAttribute(typeof(BurstCompileAttribute));
+					//}
 					classData.implementedInterfaces.Add(typeof(ISystem));
 				}
 

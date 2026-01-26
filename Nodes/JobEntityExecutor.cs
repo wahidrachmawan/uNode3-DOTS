@@ -16,12 +16,11 @@ namespace MaxyGames.UNode.Nodes {
 
 		public RunWith runWith;
 
-		//Use node object, because the serializer not support dirrect referencing.
 		[SerializeField]
-		private NodeObject reference;
-		public BaseJobNode ReferenceNode {
+		private UGraphElementRef reference;
+		public BaseJobContainer ReferenceNode {
 			get {
-				if(reference != null && reference.node is BaseJobNode node) {
+				if(reference != null && reference.reference is BaseJobContainer node) {
 					return node;
 				}
 				return null;
@@ -40,7 +39,6 @@ namespace MaxyGames.UNode.Nodes {
 		protected override void OnRegister() {
 			base.OnRegister();
 			if(ReferenceNode != null) {
-				ReferenceNode.EnsureRegistered();
 				var datas = ReferenceNode.variableDatas;
 				variablePorts = new ValueInput[datas.Count];
 				for(int i = 0; i < variablePorts.Length; i++) {
@@ -112,7 +110,7 @@ namespace MaxyGames.UNode.Nodes {
 					if(variable.value != null) {
 						initializers.Add(CG.SetValue(variable.name, variable.value()));
 					}
-					else if(variable.value == null && variable.owner is BaseJobNode.VData vdata) {
+					else if(variable.value == null && variable.owner is BaseJobContainer.VData vdata) {
 						var port = variablePorts.FirstOrDefault(p => p.name == vdata.name);
 						if(port != null) {
 							initializers.Add(CG.SetValue(variable.name, CG.GeneratePort(port)));
@@ -141,7 +139,9 @@ namespace MaxyGames.UNode.Nodes {
 		}
 
 		public override void CheckError(ErrorAnalyzer analyzer) {
-
+			if(ReferenceNode == null) {
+				analyzer.RegisterError(this, "Reference is missing.");
+			}
 		}
 	}
 }
@@ -171,9 +171,9 @@ namespace MaxyGames.UNode.Editors {
 						uNodeEditor.Highlight(node.ReferenceNode);
 					}
 					else {
-						if(nodeObject.parent != null) {
+						if(nodeObject.graph.mainGraphContainer != null) {
 							GenericMenu menu = new GenericMenu();
-							foreach(var n in nodeObject.parent.GetNodesInChildren<Nodes.BaseJobNode>()) {
+							foreach(var n in nodeObject.graph.mainGraphContainer.GetObjectsInChildren<Nodes.BaseJobContainer>()) {
 								var jobNode = n;
 								menu.AddItem(new GUIContent(n.name), false, () => {
 									node.ReferenceNode = jobNode;
@@ -185,8 +185,8 @@ namespace MaxyGames.UNode.Editors {
 				};
 
 				element.AddManipulator(new ContextualMenuManipulator(evt => {
-					if(nodeObject.parent != null) {
-						foreach(var n in nodeObject.parent.GetNodesInChildren<Nodes.BaseJobNode>()) {
+					if(nodeObject.graph.mainGraphContainer != null) {
+						foreach(var n in nodeObject.graph.mainGraphContainer.GetObjectsInChildren<Nodes.BaseJobContainer>()) {
 							var jobNode = n;
 							evt.menu.AppendAction(n.name, act => {
 								node.ReferenceNode = jobNode;

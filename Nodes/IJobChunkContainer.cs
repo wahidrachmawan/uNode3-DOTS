@@ -7,16 +7,16 @@ using Unity.Burst;
 using Unity.Entities;
 using Unity.Burst.Intrinsics;
 
+[assembly: MakeSerializable(typeof(MaxyGames.UNode.Nodes.IJobChunkContainer))]
 namespace MaxyGames.UNode.Nodes {
-	[NodeMenu("ECS", "Create IJobChunk", nodeName = "MyJob", scope = NodeScope.ECSGraph, icon = typeof(TypeIcons.RuntimeTypeIcon))]
-	public class CreateIJobChunk : BaseJobNode, IGeneratorPrePostInitializer {
-
+	[EventGraph("IJobChunk", createName = "newJobChunk")]
+	public class IJobChunkContainer : BaseJobContainer, ISuperNodeWithEntry, IGeneratorPrePostInitializer {
 		public ValueOutput chunk { get; private set; }
 		public ValueOutput unfilteredChunkIndex { get; private set; }
 		public ValueOutput useEnabledMask { get; private set; }
 		public ValueOutput chunkEnabledMask { get; private set; }
 
-		public override void RegisterEntry(NestedEntryNode node) {
+		public override void RegisterEntry(BaseEntryNode node) {
 			chunk = Node.Utilities.ValueOutput<ArchetypeChunk>(node, nameof(chunk));
 			unfilteredChunkIndex = Node.Utilities.ValueOutput<int>(node, nameof(unfilteredChunkIndex));
 			useEnabledMask = Node.Utilities.ValueOutput<bool>(node, nameof(useEnabledMask));
@@ -25,17 +25,9 @@ namespace MaxyGames.UNode.Nodes {
 			base.RegisterEntry(node);
 		}
 
-		public override string GetTitle() {
-			return "Create Job: " + name;
-		}
-
-		protected override void OnRegister() {
-			Entry.Register();
-		}
-
 		public void OnPreInitializer() {
 			//Ensure this node is registered
-			this.EnsureRegistered();
+			Entry.EnsureRegistered();
 			//Manual register the entry node.
 			CG.RegisterDependency(entryObject);
 			//Initialize the class name
@@ -109,13 +101,12 @@ namespace MaxyGames.UNode.Nodes {
 #if UNITY_EDITOR
 namespace MaxyGames.UNode.Editors {
 	using UnityEditor;
-	using UnityEditor.Experimental.GraphView;
 	using UnityEngine.UIElements;
 
-	class CreateIJobChunkDrawer : NodeDrawer<Nodes.CreateIJobChunk> {
+	class IJobChunkContainerDrawer : UGraphElementDrawer<Nodes.IJobChunkContainer> {
 		static readonly FilterAttribute componentFilter;
 
-		static CreateIJobChunkDrawer() {
+		static IJobChunkContainerDrawer() {
 			componentFilter = new FilterAttribute(typeof(IComponentData), typeof(IQueryTypeParameter)) {
 				DisplayInterfaceType = false,
 				DisplayReferenceType = true,
@@ -124,98 +115,45 @@ namespace MaxyGames.UNode.Editors {
 		}
 
 		public override void DrawLayouted(DrawerOption option) {
-			var node = GetNode(option);
+			var container = GetValue(option);
 
-			uNodeGUI.DrawCustomList(node.variableDatas, "Variables",
+			uNodeGUI.DrawCustomList(container.variableDatas, "Variables",
 				drawElement: (position, index, value) => {
 					position.height = EditorGUIUtility.singleLineHeight;
 					var portName = EditorGUI.DelayedTextField(position, new GUIContent("Name "), value.name);
 					if(portName != value.name) {
 						value.name = portName;
-						node.Register();
-						uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
-						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+						container.Entry.Register();
+						uNodeGUIUtility.GUIChanged(container, UIChangeType.Important);
+						uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 					}
 					position.y += EditorGUIUtility.singleLineHeight + 1;
 					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Type"), type => {
 						value.type = type;
-						node.Register();
-						uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
-						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+						container.Entry.Register();
+						uNodeGUIUtility.GUIChanged(container, UIChangeType.Important);
+						uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 					}, FilterAttribute.DefaultTypeFilter, option.unityObject);
 				},
 				add: position => {
 					option.RegisterUndo();
-					node.variableDatas.Add(new Nodes.CreateIJobChunk.VData());
-					node.Register();
-					uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
-					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					container.variableDatas.Add(new Nodes.BaseJobContainer.VData());
+					container.Entry.Register();
+					uNodeGUIUtility.GUIChanged(container, UIChangeType.Important);
+					uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 				},
 				remove: index => {
 					option.RegisterUndo();
-					node.variableDatas.RemoveAt(index);
-					node.Register();
-					uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
-					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					container.variableDatas.RemoveAt(index);
+					container.Entry.Register();
+					uNodeGUIUtility.GUIChanged(container, UIChangeType.Important);
+					uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 				},
 				elementHeight: index => {
 					return (EditorGUIUtility.singleLineHeight * 2) + 2;
 				});
 
 			DrawErrors(option);
-		}
-	}
-
-	[NodeCustomEditor(typeof(Nodes.CreateIJobChunk))]
-	class CreateIJobChunkView : BaseNodeView {
-		protected override void OnReloadView() {
-			base.OnReloadView();
-			var node = targetNode;
-			{
-				var element = new Button();
-				element.text = "Create Run";
-				AddControl(Direction.Input, element);
-				element.clickable.clickedWithEventInfo += (evt) => {
-					NodeEditorUtility.AddNewNode<Nodes.JobEntityExecutor>(node.nodeObject.parent, node.position.position, n => {
-						n.runWith = Nodes.JobEntityExecutor.RunWith.Run;
-						n.ReferenceNode = node as Nodes.BaseJobNode;
-						//For refreshing the graph editor
-						uNodeGUIUtility.GUIChanged(node.GetUnityObject(), UIChangeType.Important);
-					});
-				};
-			}
-			{
-				var element = new Button();
-				element.text = "Create Schedule";
-				AddControl(Direction.Input, element);
-				element.clickable.clickedWithEventInfo += (evt) => {
-					NodeEditorUtility.AddNewNode<Nodes.JobEntityExecutor>(node.nodeObject.parent, node.position.position, n => {
-						n.runWith = Nodes.JobEntityExecutor.RunWith.Schedule;
-						n.ReferenceNode = node as Nodes.BaseJobNode;
-						//For refreshing the graph editor
-						uNodeGUIUtility.GUIChanged(node.GetUnityObject(), UIChangeType.Important);
-					});
-				};
-			}
-			{
-				var element = new Button();
-				element.text = "Create ScheduleParallel";
-				AddControl(Direction.Input, element);
-				element.clickable.clickedWithEventInfo += (evt) => {
-					NodeEditorUtility.AddNewNode<Nodes.JobEntityExecutor>(node.nodeObject.parent, node.position.position, n => {
-						n.runWith = Nodes.JobEntityExecutor.RunWith.ScheduleParallel;
-						n.ReferenceNode = node as Nodes.BaseJobNode;
-						//For refreshing the graph editor
-						uNodeGUIUtility.GUIChanged(node.GetUnityObject(), UIChangeType.Important);
-					});
-				};
-			}
-		}
-
-		public override void ReloadView() {
-			base.ReloadView();
-			border.EnableInClassList(ussClassBorderFlowNode, true);
-			border.EnableInClassList(ussClassBorderOnlyInput, true);
 		}
 	}
 }

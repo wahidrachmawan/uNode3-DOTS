@@ -37,10 +37,7 @@ namespace MaxyGames.UNode.Nodes {
 		public bool burstCompile;
 		public EntityQueryOptions options = EntityQueryOptions.Default;
 
-		public List<SerializedType> withAll = new List<SerializedType>();
-		public List<SerializedType> withAny = new List<SerializedType>();
-		public List<SerializedType> withNone = new List<SerializedType>();
-		public List<SerializedType> withChangeFilter = new List<SerializedType>();
+		public List<ECSQueryFilter> queryFilters = new List<ECSQueryFilter>();
 		public List<SerializedType> withSharedComponentFilter = new List<SerializedType>();
 
 		public ValueOutput entity { get; private set; }
@@ -157,15 +154,27 @@ namespace MaxyGames.UNode.Nodes {
 					}).ToArray()
 				);
 
-			if(withAll.Count > 0) {
-				iterator = iterator.CGInvoke(nameof(QueryEnumerable<int>.WithAll), withAll.Select(item => item.type).ToArray());
+			var queries = queryFilters.OrderBy(data => (int)data.filter).GroupBy(data => data.filter);
+			foreach(var group in queries) {
+				iterator = iterator.CGInvoke(group.Key.ToString(), group.Select(item => item.type.type).ToArray());
 			}
-			if(withAny.Count > 0) {
-				iterator = iterator.CGInvoke(nameof(QueryEnumerable<int>.WithAny), withAny.Select(item => item.type).ToArray());
-			}
-			if(withNone.Count > 0) {
-				iterator = iterator.CGInvoke(nameof(QueryEnumerable<int>.WithNone), withNone.Select(item => item.type).ToArray());
-			}
+
+			//var withAll = queryFilters.Where(item => item.filter == QueryFilter.WithAll).ToList();
+			//var withAny = queryFilters.Where(item => item.filter == QueryFilter.WithAny).ToList();
+			//var withNone = queryFilters.Where(item => item.filter == QueryFilter.WithNone).ToList();
+			//var withChangeFilter = queryFilters.Where(item => item.filter == QueryFilter.WithChangeFilter).ToList();
+			//if(withAll.Count > 0) {
+			//	iterator = iterator.CGInvoke(nameof(QueryEnumerable<int>.WithAll), withAll.Select(item => item.type.type).ToArray());
+			//}
+			//if(withAny.Count > 0) {
+			//	iterator = iterator.CGInvoke(nameof(QueryEnumerable<int>.WithAny), withAny.Select(item => item.type.type).ToArray());
+			//}
+			//if(withNone.Count > 0) {
+			//	iterator = iterator.CGInvoke(nameof(QueryEnumerable<int>.WithNone), withNone.Select(item => item.type.type).ToArray());
+			//}
+			//if(withChangeFilter.Count > 0) {
+			//	iterator = iterator.CGInvoke(nameof(QueryEnumerable<int>.WithChangeFilter), withChangeFilter.Select(item => item.type.type).ToArray());
+			//}
 			if(withSharedComponentFilter.Count > 0) {
 				iterator = iterator.CGInvoke(nameof(QueryEnumerable<int>.WithSharedComponentFilter), withSharedComponentFilter.Select(item => item.type).ToArray());
 			}
@@ -352,18 +361,50 @@ namespace MaxyGames.UNode.Nodes {
 				method.code = CG.Flow(body);
 
 				//Filters
-				if(withAll.Count > 0) {
-					classBuilder.RegisterAttribute(typeof(WithAllAttribute), withAll.Select(item => CG.Value(item.type)).ToArray());
+				var queries = queryFilters.OrderBy(data => (int)data.filter).GroupBy(data => data.filter);
+				foreach(var group in queries) {
+					switch(group.Key) {
+						case QueryFilter.WithAll:
+							classBuilder.RegisterAttribute(typeof(WithAllAttribute), group.Select(item => CG.Value(item.type)).ToArray());
+							break;
+						case QueryFilter.WithAny:
+							classBuilder.RegisterAttribute(typeof(WithAnyAttribute), group.Select(item => CG.Value(item.type)).ToArray());
+							break;
+						case QueryFilter.WithNone:
+							classBuilder.RegisterAttribute(typeof(WithNoneAttribute), group.Select(item => CG.Value(item.type)).ToArray());
+							break;
+						case QueryFilter.WithChangeFilter:
+							classBuilder.RegisterAttribute(typeof(WithChangeFilterAttribute), group.Select(item => CG.Value(item.type)).ToArray());
+							break;
+						case QueryFilter.WithAbsent:
+							classBuilder.RegisterAttribute(typeof(WithAbsentAttribute), group.Select(item => CG.Value(item.type)).ToArray());
+							break;
+						case QueryFilter.WithDisabled:
+							classBuilder.RegisterAttribute(typeof(WithDisabledAttribute), group.Select(item => CG.Value(item.type)).ToArray());
+							break;
+						case QueryFilter.WithPresent:
+							classBuilder.RegisterAttribute(typeof(WithPresentAttribute), group.Select(item => CG.Value(item.type)).ToArray());
+							break;
+					}
 				}
-				if(withAny.Count > 0) {
-					classBuilder.RegisterAttribute(typeof(WithAnyAttribute), withAny.Select(item => CG.Value(item.type)).ToArray());
-				}
-				if(withNone.Count > 0) {
-					classBuilder.RegisterAttribute(typeof(WithNoneAttribute), withNone.Select(item => CG.Value(item.type)).ToArray());
-				}
-				if(withChangeFilter.Count > 0) {
-					classBuilder.RegisterAttribute(typeof(WithChangeFilterAttribute), withChangeFilter.Select(item => CG.Value(item.type)).ToArray());
-				}
+
+				//var withAll = queryFilters.Where(item => item.filter == QueryFilter.WithAll).ToList();
+				//var withAny = queryFilters.Where(item => item.filter == QueryFilter.WithAny).ToList();
+				//var withNone = queryFilters.Where(item => item.filter == QueryFilter.WithNone).ToList();
+				//var withChangeFilter = queryFilters.Where(item => item.filter == QueryFilter.WithChangeFilter).ToList();
+
+				//if(withAll.Count > 0) {
+				//	classBuilder.RegisterAttribute(typeof(WithAllAttribute), withAll.Select(item => CG.Value(item.type)).ToArray());
+				//}
+				//if(withAny.Count > 0) {
+				//	classBuilder.RegisterAttribute(typeof(WithAnyAttribute), withAny.Select(item => CG.Value(item.type)).ToArray());
+				//}
+				//if(withNone.Count > 0) {
+				//	classBuilder.RegisterAttribute(typeof(WithNoneAttribute), withNone.Select(item => CG.Value(item.type)).ToArray());
+				//}
+				//if(withChangeFilter.Count > 0) {
+				//	classBuilder.RegisterAttribute(typeof(WithChangeFilterAttribute), withChangeFilter.Select(item => CG.Value(item.type)).ToArray());
+				//}
 				if(options != EntityQueryOptions.Default) {
 					classBuilder.RegisterAttribute(typeof(WithOptionsAttribute), options.CGValue());
 				}
@@ -463,10 +504,43 @@ namespace MaxyGames.UNode.Editors {
 					return (EditorGUIUtility.singleLineHeight * 2) + 2;
 				});
 
-			uNodeGUI.DrawTypeList("With All", node.withAll, componentFilter, node.GetUnityObject());
-			uNodeGUI.DrawTypeList("With Any", node.withAny, componentFilter, node.GetUnityObject());
-			uNodeGUI.DrawTypeList("With None", node.withNone, componentFilter, node.GetUnityObject());
-			uNodeGUI.DrawTypeList("With Change Filter", node.withChangeFilter, componentFilter, node.GetUnityObject());
+			var withAll = node.queryFilters.Where(item => item.filter == QueryFilter.WithAll).ToList();
+			var withAny = node.queryFilters.Where(item => item.filter == QueryFilter.WithAny).ToList();
+			var withNone = node.queryFilters.Where(item => item.filter == QueryFilter.WithNone).ToList();
+			var withChangeFilter = node.queryFilters.Where(item => item.filter == QueryFilter.WithChangeFilter).ToList();
+
+			uNodeGUI.DrawCustomList(node.queryFilters, "Query Filters",
+				drawElement: (position, index, value) => {
+					position.height = EditorGUIUtility.singleLineHeight;
+					var filter = (QueryFilter)EditorGUI.EnumPopup(position, new GUIContent("Filter " + index), value.filter);
+					if(filter != value.filter) {
+						value.filter = filter;
+						node.Register();
+						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
+					}
+					position.y += EditorGUIUtility.singleLineHeight + 1;
+					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Component Type"), type => {
+						value.type = type;
+						node.Register();
+						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
+					}, componentFilter, option.unityObject);
+				},
+				add: position => {
+					option.RegisterUndo();
+					node.queryFilters.Add(new());
+					node.Register();
+					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
+				},
+				remove: index => {
+					option.RegisterUndo();
+					node.queryFilters.RemoveAt(index);
+					node.Register();
+					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
+				},
+				elementHeight: index => {
+					return (EditorGUIUtility.singleLineHeight * 2) + 3;
+				});
+
 			uNodeGUI.DrawTypeList("With Shared Component Filter", node.withSharedComponentFilter, sharedComponentFilter, node.GetUnityObject());
 
 			DrawInputs(option);
