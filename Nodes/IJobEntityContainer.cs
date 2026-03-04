@@ -11,11 +11,6 @@ namespace MaxyGames.UNode.Nodes {
 	[EventGraph("IJobEntity", createName = "newJob")]
 	[TypeIcons.IconGuid("bc396893cb8045f4da8ffa1d71e478da")]
 	public class IJobEntityContainer : BaseJobContainer, IIcon, ISuperNodeWithEntry, IGeneratorPrePostInitializer, IErrorCheck {
-		public enum DataKind {
-			ReadOnly,
-			ReadWrite,
-			None,
-		}
 		[Flags]
 		public enum IndexKind {
 			None = 0,
@@ -29,7 +24,7 @@ namespace MaxyGames.UNode.Nodes {
 
 			public string name;
 			public SerializedType type = typeof(IComponentData);
-			public DataKind kind;
+			public ComponentDataAccessor kind;
 
 			[NonSerialized]
 			public ValueOutput port;
@@ -77,7 +72,7 @@ namespace MaxyGames.UNode.Nodes {
 			for(int i = 0; i < datas.Count; i++) {
 				var data = datas[i];
 				data.port = Node.Utilities.ValueOutput(node, data.id, () => data.type, PortAccessibility.ReadWrite).SetName(!string.IsNullOrEmpty(data.name) ? data.name : ("Item" + (i + 1)));
-				data.port.canSetValue = () => data.kind == DataKind.ReadWrite;
+				data.port.canSetValue = () => data.kind == ComponentDataAccessor.ReadWrite;
 			}
 		}
 
@@ -88,6 +83,9 @@ namespace MaxyGames.UNode.Nodes {
 			CG.RegisterDependency(entryObject);
 			//Initialize the class name
 			CG.RegisterUserObject(CG.GenerateNewName(name), this);
+			if(executionMode == ECSLogicExecutionMode.ScheduleParallel && indexKind.HasFlags(IndexKind.ChunkIndexInQuery) == false) {
+				throw new Exception("You need to use ChunkIndexInQuery index kind if using ScheduleParallel execution mode");
+			} 
 		}
 
 		public void OnPostInitializer() {
@@ -130,6 +128,7 @@ namespace MaxyGames.UNode.Nodes {
 						name = CG.GetVariableName(data.port),
 						type = data.type,
 						owner = data,
+						attributes = data.attributes,
 					});
 				}
 			}
@@ -151,7 +150,7 @@ namespace MaxyGames.UNode.Nodes {
 								data.type, 
 								data.name, 
 								modifier: FieldModifier.PublicModifier, 
-								attributes: data.attributeData.Select(att => CG.Attribute(att)))
+								attributes: data.attributes.Select(att => CG.Attribute(att)))
 							);
 					}
 				}
@@ -182,13 +181,13 @@ namespace MaxyGames.UNode.Nodes {
 				for(int i = 0; i < variableNames.Count; i++) {
 					var data = datas[i];
 					switch(data.kind) {
-						case DataKind.ReadOnly:
+						case ComponentDataAccessor.ReadOnly:
 							parameters.Add(new CG.MPData(variableNames[i], data.type, RefKind.In));
 							break;
-						case DataKind.ReadWrite:
+						case ComponentDataAccessor.ReadWrite:
 							parameters.Add(new CG.MPData(variableNames[i], data.type, RefKind.Ref));
 							break;
-						case DataKind.None:
+						case ComponentDataAccessor.None:
 							parameters.Add(new CG.MPData(variableNames[i], data.type));
 							break;
 					}
@@ -264,6 +263,10 @@ namespace MaxyGames.UNode.Nodes {
 		public Type GetIcon() {
 			return typeof(IJobEntityContainer);
 		}
+
+		public override string GenerateParallelIndex() {
+			return CG.GetVariableName(chunkIndexInQuery);
+		}
 	}
 }
 
@@ -284,133 +287,141 @@ namespace MaxyGames.UNode.Editors {
 		}
 
 		public override void DrawLayouted(DrawerOption option) {
-			var node = GetValue(option);
+			var container = GetValue(option);
 
 			DrawHeader(option);
 
-			UInspector.Draw(option.property[nameof(node.burstCompile)]);
-			UInspector.Draw(option.property[nameof(node.options)]);
-			UInspector.Draw(option.property[nameof(node.indexKind)]);
+			UInspector.Draw(option.property[nameof(container.burstCompile)]);
+			UInspector.Draw(option.property[nameof(container.options)]);
+			UInspector.Draw(option.property[nameof(container.indexKind)]);
+			UInspector.Draw(option.property[nameof(container.executionMode)]);
 
-			uNodeGUI.DrawCustomList(node.variableDatas, "Variables",
+			uNodeGUI.DrawCustomList(container.variableDatas, "Variables",
 				drawElement: (position, index, value) => {
 					position.height = EditorGUIUtility.singleLineHeight;
 					var portName = EditorGUI.DelayedTextField(position, new GUIContent("Name "), value.name);
 					if(portName != value.name) {
 						value.name = portName;
-						node.Entry.Register();
-						uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
-						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+						container.Entry.Register();
+						uNodeGUIUtility.GUIChanged(container, UIChangeType.Important);
+						uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 					}
 					position.y += EditorGUIUtility.singleLineHeight + 1;
 					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Type"), type => {
 						value.type = type;
-						node.Entry.Register();
-						uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
-						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+						container.Entry.Register();
+						uNodeGUIUtility.GUIChanged(container, UIChangeType.Important);
+						uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 					}, FilterAttribute.DefaultTypeFilter, option.unityObject);
+					position.y += EditorGUIUtility.singleLineHeight + 3;
+					uNodeGUI.DrawAttribute(position, value.attributes, container.GetUnityObject(), atts => {
+						value.attributes = atts;
+					}, AttributeTargets.Field);
 				},
 				add: position => {
 					option.RegisterUndo();
-					node.variableDatas.Add(new ());
-					node.Entry.Register();
-					uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
-					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					container.variableDatas.Add(new ());
+					container.Entry.Register();
+					uNodeGUIUtility.GUIChanged(container, UIChangeType.Important);
+					uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 				},
 				remove: index => {
 					option.RegisterUndo();
-					node.variableDatas.RemoveAt(index);
-					node.Entry.Register();
-					uNodeGUIUtility.GUIChanged(node, UIChangeType.Important);
-					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					container.variableDatas.RemoveAt(index);
+					container.Entry.Register();
+					uNodeGUIUtility.GUIChanged(container, UIChangeType.Important);
+					uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 				},
 				elementHeight: index => {
-					return (EditorGUIUtility.singleLineHeight * 2) + 2;
+					if(container.variableDatas[index].attributes.Count > 1) {
+						return (EditorGUIUtility.singleLineHeight * 2) + 2 + 72 + (Mathf.Max(0, container.variableDatas[index].attributes.Count - 1) * 23);
+					}
+					return (EditorGUIUtility.singleLineHeight * 2) + 2 + 72;
 				});
 
-			uNodeGUI.DrawCustomList(node.datas, "Query",
+			uNodeGUI.DrawCustomList(container.datas, "Query",
 				drawElement: (position, index, value) => {
 					position.height = EditorGUIUtility.singleLineHeight;
 					var portName = EditorGUI.DelayedTextField(position, new GUIContent("Item " + index), value.name);
 					if(portName != value.name) {
 						value.name = portName;
-						node.Entry.Register();
-						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
-						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+						container.Entry.Register();
+						uNodeGUIUtility.GUIChanged(container, UIChangeType.Average);
+						uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 					}
 					position.y += EditorGUIUtility.singleLineHeight + 1;
 					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Type"), type => {
 						value.type = type;
 						if(type.HasImplementInterface(typeof(IComponentData))) {
-							if(value.kind == Nodes.IJobEntityContainer.DataKind.None) {
-								value.kind = Nodes.IJobEntityContainer.DataKind.ReadWrite;
+							if(value.kind == ComponentDataAccessor.None) {
+								value.kind = ComponentDataAccessor.ReadWrite;
 							}
 						}
 						else {
-							value.kind = Nodes.IJobEntityContainer.DataKind.None;
+							value.kind = ComponentDataAccessor.None;
 						}
-						node.Entry.Register();
-						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
-						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+						container.Entry.Register();
+						uNodeGUIUtility.GUIChanged(container, UIChangeType.Average);
+						uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 					}, componentFilter, option.unityObject);
 					position.y += EditorGUIUtility.singleLineHeight + 1;
 					uNodeGUIUtility.EditValue(position, new GUIContent("Accessibility"), value.kind, (val) => {
 						value.kind = val;
-						if(value.kind == Nodes.IJobEntityContainer.DataKind.None && value.type.type.HasImplementInterface(typeof(IComponentData))) {
-							value.kind = Nodes.IJobEntityContainer.DataKind.ReadWrite;
+						if(value.kind == ComponentDataAccessor.None && value.type.type.HasImplementInterface(typeof(IComponentData))) {
+							value.kind = ComponentDataAccessor.ReadWrite;
 						}
-						node.Entry.Register();
+						container.Entry.Register();
 					});
 				},
 				add: position => {
 					option.RegisterUndo();
-					node.datas.Add(new ());
-					node.Entry.Register();
-					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
-					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					container.datas.Add(new ());
+					container.Entry.Register();
+					uNodeGUIUtility.GUIChanged(container, UIChangeType.Average);
+					uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 				},
 				remove: index => {
 					option.RegisterUndo();
-					node.datas.RemoveAt(index);
-					node.Entry.Register();
-					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
-					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					container.datas.RemoveAt(index);
+					container.Entry.Register();
+					uNodeGUIUtility.GUIChanged(container, UIChangeType.Average);
+					uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 				},
 				elementHeight: index => {
 					return (EditorGUIUtility.singleLineHeight * 3) + 3;
 				});
 
-			uNodeGUI.DrawCustomList(node.queryFilters, "Query Filters",
+			uNodeGUI.DrawCustomList(container.queryFilters, "Query Filters",
 				drawElement: (position, index, value) => {
 					position.height = EditorGUIUtility.singleLineHeight;
 					var filter = (QueryFilter)EditorGUI.EnumPopup(position, new GUIContent("Filter " + index), value.filter);
 					if(filter != value.filter) {
 						value.filter = filter;
-						node.Entry.Register();
-						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
-						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+						container.Entry.Register();
+						uNodeGUIUtility.GUIChanged(container, UIChangeType.Average);
+						uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 					}
 					position.y += EditorGUIUtility.singleLineHeight + 1;
 					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Component Type"), type => {
 						value.type = type;
-						node.Entry.Register();
-						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
-						uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+						container.Entry.Register();
+						uNodeGUIUtility.GUIChanged(container, UIChangeType.Average);
+						uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 					}, componentFilter, option.unityObject);
 				},
 				add: position => {
 					option.RegisterUndo();
-					node.queryFilters.Add(new());
-					node.Entry.Register();
-					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
-					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					container.queryFilters.Add(new());
+					container.Entry.Register();
+					uNodeGUIUtility.GUIChanged(container, UIChangeType.Average);
+					uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 				},
 				remove: index => {
 					option.RegisterUndo();
-					node.queryFilters.RemoveAt(index);
-					node.Entry.Register();
-					uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
-					uNodeGUIUtility.GUIChanged(node.Entry, UIChangeType.Average);
+					container.queryFilters.RemoveAt(index);
+					container.Entry.Register();
+					uNodeGUIUtility.GUIChanged(container, UIChangeType.Average);
+					uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);
 				},
 				elementHeight: index => {
 					return (EditorGUIUtility.singleLineHeight * 2) + 3;

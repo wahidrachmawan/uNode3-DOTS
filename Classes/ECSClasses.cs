@@ -11,6 +11,8 @@ using Unity.Collections;
 namespace MaxyGames.UNode {
 	public interface INodeEntitiesForeach {
 		List<ECSJobVariable> JobVariables { get; }
+		ECSLogicExecutionMode LogicExecutionMode { get; }
+		string GenerateParallelIndex();
 
 		public void AddJobVariable(ECSJobVariable variable) {
 			var data = JobVariables;
@@ -30,8 +32,25 @@ namespace MaxyGames.UNode {
 		WithPresent = 6,
 	}
 
+	public enum QueryBuilderFilter {
+		WithAll = 0,
+		WithAny = 1,
+		WithNone = 2,
+		WithChangeFilter = 3,
+		WithAbsent = 4,
+		WithDisabled = 5,
+		WithPresent = 6,
+	}
+
+	[Serializable]
 	public class ECSQueryFilter {
 		public QueryFilter filter;
+		public SerializedType type = typeof(IComponentData);
+	}
+
+	[Serializable]
+	public class ECSQueryBuilderFilter {
+		public QueryBuilderFilter filter;
 		public SerializedType type = typeof(IComponentData);
 	}
 
@@ -46,10 +65,17 @@ namespace MaxyGames.UNode {
 		ScheduleParallel = 3,
 	}
 
+	public enum LookupExecutionKind {
+		Auto,
+		SystemAPI,
+		EntityManager,
+		Lookup,
+	}
+
 	public class ECSJobVariable {
 		public string name;
 		public Type type;
-		public List<AttributeData> attributeData = new();
+		public List<AttributeData> attributes = new();
 		public Func<string> value;
 
 		public object owner;
@@ -72,6 +98,29 @@ namespace MaxyGames.UNode {
 						var graph = nodeObject.graphContainer as ECSGraph;
 						var contents = CG.DeclareVariable(result, CG.Access(graph.CodegenStateName).CGAccess("EntityManager"));
 						mdata.AddCode(contents, -1000);
+					});
+				}
+				return result;
+			}
+			return null;
+		}
+
+		public static string RegisterVariable(object owner, string name, Type type, string value) {
+			if(CG.isGenerating) {
+				var result = CG.GetUserObject<string>((owner, "Vars", type));
+				if(result == null) {
+					result = CG.GenerateNewName(name);
+					CG.RegisterUserObject(result, (owner, "Vars", type));
+
+					CG.RegisterPostClassManipulator(data => {
+						data.AddVariable(new CG.VData(result, type, autoCorrection: false));
+
+						var mdata = data.GetMethodData(nameof(ISystem.OnCreate));
+						if(mdata == null)
+							throw new Exception($"There's no {nameof(ISystem.OnCreate)} event/function in a graph");
+
+						var contents = CG.Set(result, value);
+						mdata.AddCode(contents, -10);
 					});
 				}
 				return result;
@@ -113,27 +162,29 @@ namespace MaxyGames.UNode {
 			}
 			entitiesForeach = entities;
 			if(entities != null) {
-				if(entities is IJobEntityContainer jobEntity) {
-					if(jobEntity.indexKind.HasFlags(IJobEntityContainer.IndexKind.ChunkIndexInQuery)) {
-						var ecbName = ECSGraphUtility.GetECBSingleton<EndSimulationEntityCommandBufferSystem.Singleton>(nodeObject);
-						if(autoRegisterVariableInJob) {
-							var variables = entities.JobVariables;
-							if(variables != null) {
-								entities.AddJobVariable(new ECSJobVariable() {
-									name = ecbName,
-									type = typeof(EntityCommandBuffer.ParallelWriter),
-									value = () => ecbName.CGInvoke(nameof(EntityCommandBuffer.AsParallelWriter)),
-									owner = typeof(EndSimulationEntityCommandBufferSystem.Singleton),
-								});
-							}
+				var executionMode = entitiesForeach.LogicExecutionMode;
+				if(executionMode == ECSLogicExecutionMode.ScheduleParallel || executionMode == ECSLogicExecutionMode.Auto && 
+					entities is IJobEntityContainer jobEntity && 
+					jobEntity.indexKind.HasFlags(IJobEntityContainer.IndexKind.ChunkIndexInQuery)) {
+
+					var ecbName = GetECBSingleton<EndSimulationEntityCommandBufferSystem.Singleton>(nodeObject);
+					if(autoRegisterVariableInJob) {
+						var variables = entities.JobVariables;
+						if(variables != null) {
+							entities.AddJobVariable(new ECSJobVariable() {
+								name = ecbName,
+								type = typeof(EntityCommandBuffer.ParallelWriter),
+								value = () => ecbName.CGInvoke(nameof(EntityCommandBuffer.AsParallelWriter)),
+								owner = typeof(EndSimulationEntityCommandBufferSystem.Singleton),
+							});
 						}
-						commandName = ecbName;
-						commandType = typeof(EntityCommandBuffer.ParallelWriter);
-						return;
 					}
+					commandName = ecbName;
+					commandType = typeof(EntityCommandBuffer.ParallelWriter);
+					return;
 				}
-				{
-					var ecbName = ECSGraphUtility.GetECBSingleton<EndSimulationEntityCommandBufferSystem.Singleton>(nodeObject);
+				if(executionMode == ECSLogicExecutionMode.Auto || executionMode == ECSLogicExecutionMode.Schedule) {
+					var ecbName = GetECBSingleton<EndSimulationEntityCommandBufferSystem.Singleton>(nodeObject);
 					if(autoRegisterVariableInJob) {
 						var variables = entities.JobVariables;
 						if(variables != null) {
@@ -147,48 +198,163 @@ namespace MaxyGames.UNode {
 					}
 					commandName = ecbName;
 					commandType = typeof(EntityCommandBuffer);
+					return;
 				}
 			}
+			BaseGraphEvent evt = null;
+			foreach(var node in conenctions) {
+				if(node.node is BaseGraphEvent) {
+					evt = node.node as BaseGraphEvent;
+					break;
+				}
+			}
+			if(evt != null) {
+				commandName = GetEntityManager(evt);
+				commandType = typeof(EntityManager);
+			}
 			else {
-				BaseGraphEvent evt = null;
-				foreach(var node in conenctions) {
-					if(node.node is BaseGraphEvent) {
-						evt = node.node as BaseGraphEvent;
-						break;
+				var ecbName = GetEntityManager(nodeObject);
+				if(autoRegisterVariableInJob) {
+					var variables = entities.JobVariables;
+					if(variables != null) {
+						entities.AddJobVariable(new ECSJobVariable() {
+							name = ecbName,
+							type = typeof(EntityManager),
+							value = () => ecbName,
+							owner = typeof(EntityManager),
+						});
 					}
 				}
-				if(evt != null) {
-					commandName = ECSGraphUtility.GetEntityManager(evt);
-					commandType = typeof(EntityManager);
-				}
+				commandName = ecbName;
+				commandType = typeof(EntityManager);
 			}
 		}
 
-		public static string GetComponentLookup(Type componentType, List<ECSJobVariable> variables, PortAccessibility accessibility) {
+		public static string GetValueCode(NodeObject nodeObject, string name, Type type, Func<ECSLogicExecutionMode, string> value, PortAccessibility accessibility) {
+			GetECSCommand(nodeObject, out var entities, out var commandName, out var commandType, autoRegisterVariableInJob: false, isValue: true);
+			if(commandType == typeof(EntityManager)) {
+				return value(ECSLogicExecutionMode.Run);
+			}
+			else if(commandType == typeof(EntityCommandBuffer) || commandType == typeof(EntityCommandBuffer.ParallelWriter)) {
+				var variables = entities.JobVariables;
+				if(variables != null) {
+					var nm = name;
+					return GetVariableCodeValue(
+						nm,
+						type,
+						value(commandType == typeof(EntityCommandBuffer) ? ECSLogicExecutionMode.Schedule : ECSLogicExecutionMode.ScheduleParallel),
+						variables,
+						accessibility,
+						commandType == typeof(EntityCommandBuffer.ParallelWriter));
+				}
+				else {
+					throw null;
+				}
+			}
+			else {
+				throw new Exception("Invalid context of node with Auto execution mode. It should be used inside a system On Update event, IJobEntity or IJobChunk graph.");
+			}
+		}
+
+		public static string GetComponentLookup(NodeObject nodeObject, Type ComponentType, PortAccessibility accessibility) {
+			GetECSCommand(nodeObject, out var entities, out var commandName, out var commandType, autoRegisterVariableInJob: false, isValue: true);
+			if(commandType == typeof(EntityManager)) {
+				return CG.Invoke(typeof(SystemAPI), nameof(SystemAPI.GetComponentLookup),
+					new[] { ComponentType },
+					accessibility == PortAccessibility.ReadOnly ? true.CGValue() : null);
+			}
+			else if(commandType == typeof(EntityCommandBuffer) || commandType == typeof(EntityCommandBuffer.ParallelWriter)) {
+				var variables = entities.JobVariables;
+				if(variables != null) {
+					return GetComponentLookup(commandType, variables, accessibility, commandType == typeof(EntityCommandBuffer.ParallelWriter));
+				}
+				else {
+					throw null;
+				}
+			}
+			else {
+				throw new Exception("Invalid context of node with Auto execution mode. It should be used inside a system On Update event, IJobEntity or IJobChunk graph.");
+			}
+		}
+
+		public static string GetComponentLookup(Type componentType, List<ECSJobVariable> variables, PortAccessibility accessibility, bool parallel = false) {
 			var nm = componentType.Name + "Lookup";
 			var lookupType = typeof(ComponentLookup<>).MakeGenericType(componentType);
-			var variable = variables.FirstOrDefault(v => v.name == nm && object.ReferenceEquals(v.owner, lookupType));
+			return GetVariableCodeValue(
+				nm, 
+				lookupType,
+				CG.Invoke(
+					typeof(SystemAPI), 
+					nameof(SystemAPI.GetComponentLookup),
+					new[] { componentType },
+					accessibility == PortAccessibility.ReadOnly ? CG.Value(true) : null), 
+				variables, 
+				accessibility, 
+				parallel);
+		}
+
+		public static string GetBufferLookup(NodeObject nodeObject, Type ComponentType, PortAccessibility accessibility) {
+			GetECSCommand(nodeObject, out var entities, out var commandName, out var commandType, autoRegisterVariableInJob: false, isValue: true);
+			if(commandType == typeof(EntityManager)) {
+				return CG.Invoke(typeof(SystemAPI), nameof(SystemAPI.GetBufferLookup),
+					new[] { ComponentType },
+					accessibility == PortAccessibility.ReadOnly ? true.CGValue() : null);
+			}
+			else if(commandType == typeof(EntityCommandBuffer) || commandType == typeof(EntityCommandBuffer.ParallelWriter)) {
+				var variables = entities.JobVariables;
+				if(variables != null) {
+					return GetBufferLookup(commandType, variables, accessibility, commandType == typeof(EntityCommandBuffer.ParallelWriter));
+				}
+				else {
+					throw null;
+				}
+			}
+			else {
+				throw new Exception("Invalid context of node with Auto execution mode. It should be used inside a system On Update event, IJobEntity or IJobChunk graph.");
+			}
+		}
+
+		public static string GetBufferLookup(Type bufferType, List<ECSJobVariable> variables, PortAccessibility accessibility, bool parallel = false) {
+			var nm = bufferType.Name + "Lookup";
+			var lookupType = typeof(BufferLookup<>).MakeGenericType(bufferType);
+			return GetVariableCodeValue(
+				nm,
+				lookupType,
+				CG.Invoke(
+					typeof(SystemAPI),
+					nameof(SystemAPI.GetBufferLookup),
+					new[] { bufferType },
+					accessibility == PortAccessibility.ReadOnly ? CG.Value(true) : null),
+				variables,
+				accessibility,
+				parallel);
+		}
+
+		private static string GetVariableCodeValue(string variableName, Type variableType, string valueCode, List<ECSJobVariable> variables, PortAccessibility accessibility = PortAccessibility.ReadWrite, bool parallel = false) {
+			var nm = variableName;
+			var variable = variables.FirstOrDefault(v => v.name == nm && object.ReferenceEquals(v.owner, variableType));
 			if(variable == null) {
 				variable = new ECSJobVariable() {
 					name = nm,
-					type = lookupType,
-					owner = lookupType,
+					type = variableType,
+					owner = variableType,
 				};
 				variables.Add(variable);
 			}
 			bool isValid = variable.userData is PortAccessibility;
 			if(isValid == false) {
 				variable.userData = accessibility;
-				variable.value = () => CG.Invoke(typeof(SystemAPI), nameof(SystemAPI.GetComponentLookup),
-					new[] { componentType },
-					CG.Value(accessibility == PortAccessibility.ReadOnly));
+				variable.value = () => valueCode;
 				switch(accessibility) {
 					case PortAccessibility.ReadOnly:
-						variable.attributeData.Add(new AttributeData(typeof(ReadOnlyAttribute)));
+						variable.attributes.Add(new AttributeData(typeof(ReadOnlyAttribute)));
 						break;
 					case PortAccessibility.WriteOnly:
-						variable.attributeData.Add(new AttributeData(typeof(WriteOnlyAttribute)));
+						variable.attributes.Add(new AttributeData(typeof(WriteOnlyAttribute)));
 						break;
+				}
+				if(parallel) {
+					variable.attributes.Add(new AttributeData(typeof(NativeDisableParallelForRestrictionAttribute)));
 				}
 			}
 			else {
@@ -198,9 +364,12 @@ namespace MaxyGames.UNode {
 						accessibility == PortAccessibility.ReadOnly && oldAccessibility == PortAccessibility.WriteOnly ||
 						accessibility == PortAccessibility.WriteOnly && oldAccessibility == PortAccessibility.ReadOnly) {
 						variable.userData = PortAccessibility.ReadWrite;
-						variable.value = () => CG.Invoke(typeof(SystemAPI), nameof(SystemAPI.GetComponentLookup), new[] { componentType }, CG.Value(false));
-						variable.attributeData.Clear();
+						variable.value = () => valueCode;
+						variable.attributes.Clear();
 					}
+				}
+				if(parallel && variable.attributes.Any(a => a.attributeType == typeof(NativeDisableParallelForRestrictionAttribute)) == false) {
+					variable.attributes.Add(new AttributeData(typeof(NativeDisableParallelForRestrictionAttribute)));
 				}
 			}
 			return nm;
@@ -217,7 +386,6 @@ namespace MaxyGames.UNode {
 						var mdata = data.GetMethodData(nameof(ISystem.OnUpdate));
 						if(mdata == null)
 							throw new Exception($"There's no {nameof(ISystem.OnUpdate)} event/function in a graph");
-
 						var graph = nodeObject.graphContainer as ECSGraph;
 						var contents = CG.DeclareVariable(
 							result,

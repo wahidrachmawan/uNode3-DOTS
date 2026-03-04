@@ -44,6 +44,8 @@ namespace MaxyGames.UNode.Nodes {
 		public FlowOutput body { get; private set; }
 		public List<ECSJobVariable> JobVariables => CG.GetUserObject<List<ECSJobVariable>>(nodeObject);
 
+		public ECSLogicExecutionMode LogicExecutionMode => ECSLogicExecutionMode.Run;
+
 		protected override void OnRegister() {
 			body = FlowOutput(nameof(body));
 			base.OnRegister();
@@ -414,6 +416,10 @@ namespace MaxyGames.UNode.Nodes {
 				//Register the generated type code
 				classData.RegisterNestedType(CG.WrapWithInformation(classBuilder.GenerateCode(), this));
 			});
+		}
+
+		public string GenerateParallelIndex() {
+			throw new NotImplementedException();
 		}
 	}
 }

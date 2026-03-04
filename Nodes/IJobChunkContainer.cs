@@ -59,6 +59,7 @@ namespace MaxyGames.UNode.Nodes {
 						name = CG.GetVariableName(data.port),
 						type = data.type,
 						owner = data,
+						attributes = data.attributes,
 					});
 				}
 			}
@@ -77,7 +78,7 @@ namespace MaxyGames.UNode.Nodes {
 								data.type,
 								data.name,
 								modifier: FieldModifier.PublicModifier,
-								attributes: data.attributeData.Select(att => CG.Attribute(att)))
+								attributes: data.attributes.Select(att => CG.Attribute(att)))
 							);
 					}
 				}
@@ -106,6 +107,10 @@ namespace MaxyGames.UNode.Nodes {
 		public Type GetIcon() {
 			return typeof(IJobChunkContainer);
 		}
+
+		public override string GenerateParallelIndex() {
+			return CG.GetVariableName(unfilteredChunkIndex);
+		}
 	}
 }
 
@@ -129,6 +134,8 @@ namespace MaxyGames.UNode.Editors {
 			var container = GetValue(option);
 
 			DrawHeader(option);
+
+			UInspector.Draw(option.property[nameof(container.executionMode)]);
 
 			uNodeGUI.DrawCustomList(container.variableDatas, "Variables",
 				drawElement: (position, index, value) => {

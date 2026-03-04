@@ -103,21 +103,21 @@ namespace MaxyGames.UNode {
 					nameof(ISystem.OnCreate),
 					typeof(void),
 					new[] {
-					new CG.MPData(parameterName, typeof(SystemState), RefKind.Ref)
+						new CG.MPData(parameterName, typeof(SystemState), RefKind.Ref)
 					}
 				).SetToPublic();
 				onUpdate = CG.generatorData.AddMethod(
 					nameof(ISystem.OnUpdate),
 					typeof(void),
 					new[] {
-					new CG.MPData(parameterName, typeof(SystemState), RefKind.Ref)
+						new CG.MPData(parameterName, typeof(SystemState), RefKind.Ref)
 					}
 				).SetToPublic();
 				onDestroy = CG.generatorData.AddMethod(
 					nameof(ISystem.OnDestroy),
 					typeof(void),
 					new[] {
-					new CG.MPData(parameterName, typeof(SystemState), RefKind.Ref)
+						new CG.MPData(parameterName, typeof(SystemState), RefKind.Ref)
 					}
 				).SetToPublic();
 				if(GraphData.mainGraphContainer.GetObjectsInChildren().Any(element => element is NodeObject node && (node.node is Nodes.OnSystemStartRunning || node.node is Nodes.OnSystemStopRunning))) {

@@ -62,8 +62,14 @@ namespace MaxyGames.UNode.Nodes {
 					}
 					break;
 			}
-			if(dependsOn != null && dependsOn.isAssigned) {
-				jobHandle = ValueOutput(nameof(jobHandle), typeof(Unity.Jobs.JobHandle));
+			query.SetTooltip("The query selecting chunks with the necessary components (optional)");
+			query.MarkAsOptional();
+			if(dependsOn != null) {
+				dependsOn.SetTooltip("The handle identifying already scheduled jobs that could constrain this job.\r\nA job that writes to a component cannot run in parallel with other jobs that read or write that component.\r\nJobs that only read the same components can run in parallel.");
+				dependsOn.MarkAsOptional();
+				if(dependsOn.isAssigned) {
+					jobHandle = ValueOutput(nameof(jobHandle), typeof(Unity.Jobs.JobHandle));
+				}
 			}
 		}
 
@@ -77,10 +83,6 @@ namespace MaxyGames.UNode.Nodes {
 					return $"Job.ScheduleParallel";
 			}
 			return base.GetTitle();
-		}
-
-		protected override void OnExecuted(Flow flow) {
-			throw new NotImplementedException();
 		}
 
 		public override void OnGeneratorInitialize() {
@@ -150,7 +152,6 @@ namespace MaxyGames.UNode.Nodes {
 #if UNITY_EDITOR
 namespace MaxyGames.UNode.Editors {
 	using UnityEditor;
-	using UnityEditor.Experimental.GraphView;
 	using UnityEngine.UIElements;
 
 	[NodeCustomEditor(typeof(Nodes.JobEntityExecutor))]
