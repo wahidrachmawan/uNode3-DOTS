@@ -7,8 +7,8 @@ using System.Collections.Generic;
 using Unity.Entities;
 
 namespace MaxyGames.UNode.Nodes {
-    [NodeMenu("ECS/Data", "Instantiate Entity", scope = NodeScope.ECSGraphAndJob)]
-    public class InstantiateEntity : ValueNode {
+	[NodeMenu("ECS/Data", "InstantiateEntity", scope = NodeScope.ECSGraphAndJob, inputs = new[] { typeof(Entity) }, outputs = new[] { typeof(Entity) })]
+	public class InstantiateEntity : ValueNode {
 		[NonSerialized]
 		public ValueInput sourceEntity;
 		[NonSerialized]

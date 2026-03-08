@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using Unity.Entities;
 
 namespace MaxyGames.UNode.Nodes {
-	[NodeMenu("ECS/Flow", "Add Buffer", scope = NodeScope.ECSGraphAndJob)]
+	[NodeMenu("ECS/Flow", "AddBuffer", scope = NodeScope.ECSGraphAndJob, hasFlowInput = true, hasFlowOutput = true, inputs = new[] { typeof(Entity) })]
 	public class AddBuffer : ECSNode {
 		[Filter(typeof(IBufferElementData), DisplayAbstractType =false)]
 		public SerializedType type;

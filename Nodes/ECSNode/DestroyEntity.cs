@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using Unity.Entities;
 
 namespace MaxyGames.UNode.Nodes {
-	[NodeMenu("ECS/Flow", "Destroy Entity", scope = NodeScope.ECSGraphAndJob)]
+	[NodeMenu("ECS/Flow", "DestroyEntity", scope = NodeScope.ECSGraphAndJob, hasFlowInput = true, hasFlowOutput = true, inputs = new[] { typeof(Entity) })]
 	public class DestroyEntity : ECSNode {
 
 		protected override string GenerateFlowCode() {

@@ -34,13 +34,29 @@ namespace MaxyGames.UNode.Editors {
 				Directory.CreateDirectory(OutputDirectory);
 				// Use AssemblyBuilder
 				var builder = new AssemblyBuilder(path, scriptPaths);
-
+				builder.additionalDefines = RoslynUtility.AssemblyCSharp.defines;
 				builder.additionalReferences = RoslynUtility.AssemblyCSharp.allReferences.Append(RoslynUtility.AssemblyCSharp.outputPath).ToArray();
-
+				
 				builder.buildFinished += (path, result) => {
-					Debug.Log("Compileds: " + path);
+					bool valid = true;
 					foreach(var msg in result) {
-						Debug.Log($"{msg.type}: {msg.message}");
+						if(msg.type == CompilerMessageType.Error) {
+							Debug.LogError($"{msg.type}: {msg.message}");
+							valid = false;
+						}
+						else if(msg.type == CompilerMessageType.Warning) {
+							Debug.LogWarning($"{msg.type}: {msg.message}");
+						}
+						else {
+							Debug.Log($"{msg.type}: {msg.message}");
+						}
+					}
+					if(valid) {
+						Debug.Log("Compiled to: " + path);
+					}
+					else {
+						Debug.LogError("Compile failed");
+						return;
 					}
 					RunILPP(path, out var rawAssembly, out var rawPdb);
 
@@ -51,10 +67,10 @@ namespace MaxyGames.UNode.Editors {
 					callback?.Invoke(true);
 				};
 
-				builder.buildStarted += path => Debug.Log("Starting build: " + path);
+				builder.buildStarted += path => Debug.Log("Starting compile: " + path);
 
 				if(!builder.Build()) {
-					Debug.LogError("Build failed to start");
+					Debug.LogError("Compile failed to start");
 					callback?.Invoke(false);
 				}
 			}
@@ -81,6 +97,11 @@ namespace MaxyGames.UNode.Editors {
 					callback?.Invoke(false);
 				}
 				else {
+
+					RunILPP(OutputPath, out var rawAssembly, out var rawPdb);
+
+					File.WriteAllBytes(OutputPath + ".dll", rawAssembly);
+					File.WriteAllBytes(OutputPath + ".pdb", rawPdb);
 
 					Debug.Log("Compiled systems successfully.");
 					HotReloadSystemManager.LoadCompiledAssembly(OutputPath + ".dll");

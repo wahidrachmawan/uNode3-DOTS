@@ -42,6 +42,13 @@ namespace MaxyGames.UNode {
 		WithPresent = 6,
 	}
 
+	public enum DataAccessor {
+		ReadOnly,
+		ReadWrite,
+		WriteOnly,
+		None,
+	}
+
 	[Serializable]
 	public class ECSQueryFilter {
 		public QueryFilter filter;

@@ -39,6 +39,7 @@ namespace MaxyGames.UNode.Editors.Analyzer {
 		}
 
 		private bool IsSystemGraph(IGraph graph) {
+			if(graph is ECSGraph) return true;
 			var inheritType = graph.GetGraphInheritType();
 			if(inheritType != null) {
 				if(inheritType == typeof(ValueType)) {

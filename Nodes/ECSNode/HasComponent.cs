@@ -8,7 +8,7 @@ using Unity.Entities;
 using Unity.Collections;
 
 namespace MaxyGames.UNode.Nodes {
-    [NodeMenu("ECS/Data", "Has Component", scope = NodeScope.ECSGraphAndJob)]
+    [NodeMenu("ECS/Data", "HasComponent", scope = NodeScope.ECSGraphAndJob, inputs = new[] { typeof(Entity) }, outputs = new[] { typeof(bool) })]
     public class HasComponent : ValueNode {
 		[Filter(typeof(IComponentData), DisplayAbstractType = false)]
 		public SerializedType type;

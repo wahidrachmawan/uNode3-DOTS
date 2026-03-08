@@ -24,7 +24,7 @@ namespace MaxyGames.UNode.Nodes {
 
 			public string name;
 			public SerializedType type = typeof(IComponentData);
-			public ComponentDataAccessor kind;
+			public DataAccessor kind;
 
 			[NonSerialized]
 			public ValueOutput port;
@@ -72,7 +72,7 @@ namespace MaxyGames.UNode.Nodes {
 			for(int i = 0; i < datas.Count; i++) {
 				var data = datas[i];
 				data.port = Node.Utilities.ValueOutput(node, data.id, () => data.type, PortAccessibility.ReadWrite).SetName(!string.IsNullOrEmpty(data.name) ? data.name : ("Item" + (i + 1)));
-				data.port.canSetValue = () => data.kind == ComponentDataAccessor.ReadWrite;
+				data.port.canSetValue = () => data.kind == DataAccessor.ReadWrite;
 			}
 		}
 
@@ -181,13 +181,13 @@ namespace MaxyGames.UNode.Nodes {
 				for(int i = 0; i < variableNames.Count; i++) {
 					var data = datas[i];
 					switch(data.kind) {
-						case ComponentDataAccessor.ReadOnly:
+						case DataAccessor.ReadOnly:
 							parameters.Add(new CG.MPData(variableNames[i], data.type, RefKind.In));
 							break;
-						case ComponentDataAccessor.ReadWrite:
+						case DataAccessor.ReadWrite:
 							parameters.Add(new CG.MPData(variableNames[i], data.type, RefKind.Ref));
 							break;
-						case ComponentDataAccessor.None:
+						case DataAccessor.None:
 							parameters.Add(new CG.MPData(variableNames[i], data.type));
 							break;
 					}
@@ -353,12 +353,12 @@ namespace MaxyGames.UNode.Editors {
 					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Type"), type => {
 						value.type = type;
 						if(type.HasImplementInterface(typeof(IComponentData))) {
-							if(value.kind == ComponentDataAccessor.None) {
-								value.kind = ComponentDataAccessor.ReadWrite;
+							if(value.kind == DataAccessor.None) {
+								value.kind = DataAccessor.ReadWrite;
 							}
 						}
 						else {
-							value.kind = ComponentDataAccessor.None;
+							value.kind = DataAccessor.None;
 						}
 						container.Entry.Register();
 						uNodeGUIUtility.GUIChanged(container, UIChangeType.Average);
@@ -367,8 +367,8 @@ namespace MaxyGames.UNode.Editors {
 					position.y += EditorGUIUtility.singleLineHeight + 1;
 					uNodeGUIUtility.EditValue(position, new GUIContent("Accessibility"), value.kind, (val) => {
 						value.kind = val;
-						if(value.kind == ComponentDataAccessor.None && value.type.type.HasImplementInterface(typeof(IComponentData))) {
-							value.kind = ComponentDataAccessor.ReadWrite;
+						if(value.kind == DataAccessor.None && value.type.type.HasImplementInterface(typeof(IComponentData))) {
+							value.kind = DataAccessor.ReadWrite;
 						}
 						container.Entry.Register();
 					});

@@ -1,14 +1,10 @@
 using UnityEngine;
 using System;
-using System.Linq;
-using System.Reflection;
-using System.Collections;
-using System.Collections.Generic;
 using Unity.Entities;
 
 namespace MaxyGames.UNode.Nodes {
-    [NodeMenu("ECS/Flow", "Set Component", scope = NodeScope.ECSGraphAndJob)]
-    public class SetComponent : ECSNode {
+	[NodeMenu("ECS/Flow", "SetComponent", scope = NodeScope.ECSGraphAndJob, hasFlowInput = true, hasFlowOutput = true, inputs = new[] { typeof(IComponentData) })]
+	public class SetComponent : ECSNode {
 		[NonSerialized]
 		public ValueInput component;
 

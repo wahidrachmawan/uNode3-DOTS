@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using Unity.Entities;
 
 namespace MaxyGames.UNode.Nodes {
-	[NodeMenu("ECS/Flow", "Add Component", scope = NodeScope.ECSGraphAndJob)]
+	[NodeMenu("ECS/Flow", "AddComponent", scope = NodeScope.ECSGraphAndJob, hasFlowInput = true, hasFlowOutput = true, inputs = new[] { typeof(Entity), typeof(IComponentData) })]
 	public class AddComponent : ECSNode {
 		[Filter(typeof(IComponentData), DisplayAbstractType = false)]
 		public SerializedType type;

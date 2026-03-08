@@ -6,7 +6,7 @@ using Unity.Entities;
 using System.Linq;
 
 namespace MaxyGames.UNode.Nodes {
-	[NodeMenu("ECS/Flow", "Set Buffer", scope = NodeScope.ECSGraphAndJob)]
+	[NodeMenu("ECS/Flow", "SetBuffer", scope = NodeScope.ECSGraphAndJob, hasFlowInput = true, hasFlowOutput = true, inputs = new[] { typeof(Entity), typeof(IBufferElementData) })]
 	public class SetBuffer : ECSNode {
 		[Filter(typeof(IBufferElementData), DisplayAbstractType = false)]
 		public SerializedType type = SerializedType.None;
@@ -41,8 +41,8 @@ namespace MaxyGames.UNode.Nodes {
 				});
 			var nm = CG.GenerateNewName("buffer");
 			contents = CG.Flow(
-				CG.DeclareVariable(nm, contents), 
-				nm.CGFlowInvoke(nameof(IList.Clear)), 
+				CG.DeclareVariable(nm, contents),
+				nm.CGFlowInvoke(nameof(IList.Clear)),
 				CG.Flow(buffers.Where(x => x.port.isAssigned).Select(x => nm.CGInvoke(nameof(IList.Add), x.port.CGValue())))
 			);
 			return CG.Flow(contents, CG.FlowFinish(enter, exit));

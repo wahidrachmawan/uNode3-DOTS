@@ -8,7 +8,7 @@ using Unity.Entities;
 using Unity.Collections;
 
 namespace MaxyGames.UNode.Nodes {
-    [NodeMenu("ECS/Data", "Has Singleton", scope = NodeScope.ECSGraphAndJob)]
+    [NodeMenu("ECS/Data", "HasSingleton", scope = NodeScope.ECSGraphAndJob, outputs = new[] { typeof(bool) })]
     public class HasSingleton : ValueNode {
 		[Filter(typeof(IComponentData), DisplayAbstractType = false)]
 		public SerializedType type;

@@ -14,6 +14,7 @@ namespace MaxyGames.UNode.Nodes {
 		public enum RunKind {
 			Run,
 			Schedule,
+			ScheduleParallel,
 		}
 
 		public enum DataKind {
@@ -42,11 +43,16 @@ namespace MaxyGames.UNode.Nodes {
 
 		public ValueOutput entity { get; private set; }
 		public FlowOutput body { get; private set; }
+		public ValueOutput chunkIndexInQuery { get; private set; }
 		public List<ECSJobVariable> JobVariables => CG.GetUserObject<List<ECSJobVariable>>(nodeObject);
 
-		public ECSLogicExecutionMode LogicExecutionMode => ECSLogicExecutionMode.Run;
+		public ECSLogicExecutionMode LogicExecutionMode => runOn switch {
+			RunKind.Schedule => ECSLogicExecutionMode.Schedule,
+			RunKind.ScheduleParallel => ECSLogicExecutionMode.ScheduleParallel,
+			_ => ECSLogicExecutionMode.Run,
+		};
 
-		protected override void OnRegister() {
+	protected override void OnRegister() {
 			body = FlowOutput(nameof(body));
 			base.OnRegister();
 			exit.SetName("Exit");
@@ -58,6 +64,10 @@ namespace MaxyGames.UNode.Nodes {
 				var data = datas[i];
 				data.port = ValueOutput(data.id, data.type, PortAccessibility.ReadWrite).SetName(!string.IsNullOrEmpty(data.name) ? data.name : ("Item" + (i + 1)));
 				data.port.canSetValue = () => data.kind == DataKind.ReadWriteComponent;
+			}
+			if(runOn == RunKind.ScheduleParallel) {
+				chunkIndexInQuery = ValueOutput(nameof(chunkIndexInQuery), typeof(int)).SetName("chunkIndexInQuery");
+				chunkIndexInQuery.SetTooltip("Used as the chunk index inside the current query.");
 			}
 		}
 
@@ -115,11 +125,11 @@ namespace MaxyGames.UNode.Nodes {
 		}
 
 		public override string GetTitle() {
-			return "Foreach Entities: " + string.Join(", ", datas.Select(d => d.type.prettyName)).Wrap();
+			return runOn.ToString() + " Foreach: " + string.Join(", ", datas.Select(d => d.type.prettyName)).Wrap();
 		}
 
 		public override string GetRichTitle() {
-			return "Foreach Entities: " + string.Join(", ", datas.Select(d => uNodeUtility.WrapTextWithTypeColor(d.type.prettyName, d.type.type))).Wrap();
+			return runOn.ToString() + " Foreach: " + string.Join(", ", datas.Select(d => uNodeUtility.WrapTextWithTypeColor(d.type.prettyName, d.type.type))).Wrap();
 		}
 
 		private string GenerateScheduleCode() {
@@ -130,13 +140,13 @@ namespace MaxyGames.UNode.Nodes {
 
 			return CG.Flow(
 				CG.DeclareVariable("job", CG.New(className, null, variables.Select(v => v.name.CGSetValue(v.value())))),
-				job.CGFlowInvoke(nameof(IJobEntityExtensions.Schedule)),
+				job.CGFlowInvoke(runOn == RunKind.Schedule ? nameof(IJobEntityExtensions.Schedule) : nameof(IJobEntityExtensions.ScheduleParallel)),
 				CG.FlowFinish(enter, exit)
 			);
 		}
 
 		protected override string GenerateFlowCode() {
-			if(runOn == RunKind.Schedule) {
+			if(runOn != RunKind.Run) {
 				return GenerateScheduleCode();
 			}
 			List<string> variableNames = datas.Select(item => CG.GetVariableName(item.port)).ToList();
@@ -187,8 +197,12 @@ namespace MaxyGames.UNode.Nodes {
 			if(options != EntityQueryOptions.Default) {
 				iterator = iterator.CGInvoke(nameof(QueryEnumerable<int>.WithOptions), options.CGValue());
 			}
+			var foreachVarNames = string.Join(", ", variableNames);
+			if(variableNames.Count > 1) {
+				foreachVarNames = foreachVarNames.Wrap();
+			}
 			return CG.Flow(
-				CG.Foreach(null, string.Join(", ", variableNames).Wrap(), iterator, CG.Flow(body)),
+				CG.Foreach(null, foreachVarNames, iterator, CG.Flow(body)),
 				CG.FlowFinish(enter, exit)
 			);
 		}
@@ -203,6 +217,10 @@ namespace MaxyGames.UNode.Nodes {
 
 		public void OnPostInitializer() {
 			if(runOn == RunKind.Run) return;
+			if(chunkIndexInQuery != null) {
+				var vName = CG.RegisterVariable(chunkIndexInQuery);
+				CG.RegisterPort(chunkIndexInQuery, () => vName);
+			}
 			var targetBody = body.GetTargetNode();
 			string className = CG.GetUserObject<string>(this);
 			List<string> variableNames = datas.Select(item => CG.RegisterVariable(item.port)).ToList();
@@ -358,6 +376,11 @@ namespace MaxyGames.UNode.Nodes {
 							break;
 					}
 				}
+				if(chunkIndexInQuery != null) {
+					CG.MPData paramData = new CG.MPData(CG.GetVariableName(chunkIndexInQuery), typeof(int));
+					paramData.RegisterAttribute(typeof(ChunkIndexInQuery));
+					parameters.Add(paramData);
+				}
 				method.parameters = parameters;
 				//Generate code for execute logic
 				method.code = CG.Flow(body);
@@ -419,7 +442,9 @@ namespace MaxyGames.UNode.Nodes {
 		}
 
 		public string GenerateParallelIndex() {
-			throw new NotImplementedException();
+			if(runOn != RunKind.ScheduleParallel)
+				throw new Exception("Attemp to get parallel index on non Parallel job");
+			return CG.GetVariableName(chunkIndexInQuery);
 		}
 	}
 }
@@ -427,15 +452,12 @@ namespace MaxyGames.UNode.Nodes {
 #if UNITY_EDITOR
 namespace MaxyGames.UNode.Editors {
 	using UnityEditor;
-	using UnityEditor.Experimental.GraphView;
-	using UnityEngine.UIElements;
-	using UnityEditor.UIElements;
 
-	class SystemAPIForeachDrawer : NodeDrawer<Nodes.EntitiesForeach> {
+	class EntitiesForeachDrawer : NodeDrawer<Nodes.EntitiesForeach> {
 		static readonly FilterAttribute componentFilter;
 		static readonly FilterAttribute sharedComponentFilter;
 
-		static SystemAPIForeachDrawer() {
+		static EntitiesForeachDrawer() {
 			componentFilter = new FilterAttribute(typeof(IComponentData), typeof(IQueryTypeParameter)) {
 				DisplayInterfaceType = false,
 				DisplayReferenceType = true,
@@ -509,11 +531,6 @@ namespace MaxyGames.UNode.Editors {
 					}
 					return (EditorGUIUtility.singleLineHeight * 2) + 2;
 				});
-
-			var withAll = node.queryFilters.Where(item => item.filter == QueryFilter.WithAll).ToList();
-			var withAny = node.queryFilters.Where(item => item.filter == QueryFilter.WithAny).ToList();
-			var withNone = node.queryFilters.Where(item => item.filter == QueryFilter.WithNone).ToList();
-			var withChangeFilter = node.queryFilters.Where(item => item.filter == QueryFilter.WithChangeFilter).ToList();
 
 			uNodeGUI.DrawCustomList(node.queryFilters, "Query Filters",
 				drawElement: (position, index, value) => {

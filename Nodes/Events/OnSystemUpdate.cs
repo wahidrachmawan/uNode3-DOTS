@@ -13,7 +13,7 @@ namespace MaxyGames.UNode.Nodes {
 		protected override void OnRegister() {
 			base.OnRegister();
 			deltaTime = ValueOutput<float>(nameof(deltaTime));
-			elapsedTime = ValueOutput<float>(nameof(elapsedTime));
+			elapsedTime = ValueOutput<double>(nameof(elapsedTime));
 			entityManager = ValueOutput<EntityManager>(nameof(entityManager));
 		}
 
@@ -25,7 +25,7 @@ namespace MaxyGames.UNode.Nodes {
 				CG.RegisterPort(deltaTime, () => value);
 			}
 			if(elapsedTime.hasValidConnections) {
-				var value = CG.RegisterLocalVariable(nameof(elapsedTime), typeof(float));
+				var value = CG.RegisterLocalVariable(nameof(elapsedTime), typeof(double));
 				CG.RegisterUserObject(value, elapsedTime);
 				CG.RegisterPort(elapsedTime, () => value);
 			}

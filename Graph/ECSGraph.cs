@@ -7,6 +7,7 @@ using UnityEngine;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Transforms;
+using System.Reflection;
 
 namespace MaxyGames.UNode {
 	[GraphSystem(
@@ -17,7 +18,7 @@ namespace MaxyGames.UNode {
 		isScriptGraph = true,
 		generationKind = GenerationKind.Compatibility)]
 	[TypeIcons.IconGuid("9b88b1c74c6a1244b97f851a405560c9")]
-	public class ECSGraph : GraphAsset, IClassGraph, IClassModifier, IGraphWithVariables, IGraphWithProperties, IGraphWithFunctions, IGraphWithAttributes, INamespaceSystem, ICustomMainGraph, IGraphWithEventGraph, IGeneratorPrePostInitializer {
+	public class ECSGraph : GraphAsset, IClassGraph, IClassModifier, IGraphWithVariables, IGraphWithProperties, IGraphWithFunctions, IGraphWithAttributes, INamespaceSystem, ICustomMainGraph, IGraphWithEventGraph, IGeneratorPrePostInitializer, IPrivateGraph {
 		public string @namespace;
 		public List<string> usingNamespaces = new List<string>() { "Unity.Burst", "Unity.Entities", "Unity.Transforms", "Unity.Mathematics" };
 		public ClassModifier modifier = new ClassModifier() { Partial = true };
@@ -60,12 +61,13 @@ namespace MaxyGames.UNode {
 			set => usingNamespaces = value;
 		}
 
-		public string MainGraphScope => NodeScope.ECSGraph;
+		public string MainGraphScope => NodeScope.ECSGraph + NodeScope.OR + NodeScope.FlowGraph;
 
 		public bool IsISystem => inheritType == typeof(ValueType);
 
 		GeneratedScriptData ITypeWithScriptData.ScriptData => scriptData;
 		Type IClassGraph.InheritType => inheritType;
+
 		ClassModifier IClassModifier.GetModifier() {
 			modifier.Partial = true;
 			return modifier;

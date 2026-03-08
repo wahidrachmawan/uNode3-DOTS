@@ -8,8 +8,8 @@ using Unity.Entities;
 using Unity.Collections;
 
 namespace MaxyGames.UNode.Nodes {
-    [NodeMenu("ECS/Data", "Get Buffer", scope = NodeScope.ECSGraphAndJob)]
-    public class GetBuffer : ValueNode {
+	[NodeMenu("ECS/Data", "GetBuffer", scope = NodeScope.ECSGraphAndJob, inputs = new[] { typeof(Entity) }, outputs = new[] { typeof(IBufferElementData) })]
+	public class GetBuffer : ValueNode {
 		[Filter(typeof(IBufferElementData), DisplayAbstractType = false)]
 		public SerializedType type = SerializedType.None;
 		public LookupExecutionKind executionKind = LookupExecutionKind.Auto;

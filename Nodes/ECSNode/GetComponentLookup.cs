@@ -8,7 +8,7 @@ using Unity.Entities;
 using Unity.Collections;
 
 namespace MaxyGames.UNode.Nodes {
-    [NodeMenu("ECS/Data", "Get Component Lookup", scope = NodeScope.ECSGraphAndJob)]
+    [NodeMenu("ECS/Data", "GetComponentLookup", scope = NodeScope.ECSGraphAndJob, outputs = new[] { typeof(ComponentLookup<>) })]
     public class GetComponentLookup : ValueNode {
 		[Filter(typeof(IComponentData), DisplayAbstractType = false)]
 		public SerializedType type = SerializedType.None;

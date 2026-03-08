@@ -8,7 +8,7 @@ using Unity.Entities;
 using Unity.Collections;
 
 namespace MaxyGames.UNode.Nodes {
-    [NodeMenu("ECS/Data", "Get Singleton Buffer", scope = NodeScope.ECSGraphAndJob)]
+    [NodeMenu("ECS/Data", "GetSingletonBuffer", scope = NodeScope.ECSGraphAndJob, outputs = new[] { typeof(DynamicBuffer<>) })]
     public class GetSingletonBuffer : ValueNode {
 		[Filter(typeof(IBufferElementData), DisplayAbstractType = false, DisplayReferenceType =false)]
 		public SerializedType type = SerializedType.None;
