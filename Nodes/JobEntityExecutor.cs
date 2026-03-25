@@ -38,14 +38,6 @@ namespace MaxyGames.UNode.Nodes {
 
 		protected override void OnRegister() {
 			base.OnRegister();
-			if(ReferenceNode != null) {
-				var datas = ReferenceNode.variableDatas;
-				variablePorts = new ValueInput[datas.Count];
-				for(int i = 0; i < variablePorts.Length; i++) {
-					var data = datas[i];
-					variablePorts[i] = ValueInput(data.id, () => data.type).SetName(data.name);
-				}
-			}
 			switch(runWith) {
 				case RunWith.Run:
 					query = ValueInput(nameof(query), typeof(EntityQuery));
@@ -69,6 +61,14 @@ namespace MaxyGames.UNode.Nodes {
 				dependsOn.MarkAsOptional();
 				if(dependsOn.isAssigned) {
 					jobHandle = ValueOutput(nameof(jobHandle), typeof(Unity.Jobs.JobHandle));
+				}
+			}
+			if(ReferenceNode != null) {
+				var datas = ReferenceNode.variableDatas;
+				variablePorts = new ValueInput[datas.Count];
+				for(int i = 0; i < variablePorts.Length; i++) {
+					var data = datas[i];
+					variablePorts[i] = ValueInput(data.id, () => data.type).SetName(data.name);
 				}
 			}
 		}

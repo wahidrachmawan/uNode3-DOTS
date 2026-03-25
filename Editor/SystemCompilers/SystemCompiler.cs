@@ -17,6 +17,9 @@ namespace MaxyGames.UNode.Editors {
 		public static string OutputPath => "Library/uNode_ECS/" + OutputName;
 		public static string OutputDirectory => "Library/uNode_ECS";
 		public static string OutputName => "SystemAssembly";
+		private static string OutputDllPath => OutputPath + ".dll";
+		private static string OutputPdbPath => OutputPath + ".pdb";
+
 		public static string CSXPath => ""; // Relative to project root
 		private static int m_fileIndex = 0;
 
@@ -30,6 +33,13 @@ namespace MaxyGames.UNode.Editors {
 
 		public static void CompileScripts(string[] scriptPaths, Action<bool> callback = null) {
 			if(useAssemblyBuilder) {
+				if(File.Exists(OutputPath + m_fileIndex + ".dll")) {
+					try {
+						File.Delete(OutputPath + m_fileIndex + ".dll");
+						File.Delete(OutputPath + m_fileIndex + ".pdb");
+					} catch { }
+				}
+
 				var path = OutputPath + ++m_fileIndex;
 				Directory.CreateDirectory(OutputDirectory);
 				// Use AssemblyBuilder
@@ -57,17 +67,17 @@ namespace MaxyGames.UNode.Editors {
 					}
 					RunILPP(path, out var rawAssembly, out var rawPdb);
 
-					File.WriteAllBytes(OutputPath + ".dll", rawAssembly);
-					File.WriteAllBytes(OutputPath + ".pdb", rawPdb);
+					File.WriteAllBytes(OutputDllPath, rawAssembly);
+					File.WriteAllBytes(OutputPdbPath, rawPdb);
 
 					Debug.Log("Compiled to: " + OutputPath);
 
-					if(Application.isPlaying)
-						HotReloadSystemManager.LoadCompiledAssembly(OutputPath + ".dll");
+					HotReloadSystemManager.LoadCompiledAssembly(OutputDllPath);
+					
 					callback?.Invoke(true);
 				};
 
-				builder.buildStarted += path => Debug.Log("Starting compile scripts" );
+				builder.buildStarted += path => Debug.Log($"Starting compile {scriptPaths.Length} scripts.\n" + string.Join('\n', scriptPaths.Select(p => "Path => " + p)));
 
 				if(!builder.Build()) {
 					Debug.LogError("Compile failed to start");

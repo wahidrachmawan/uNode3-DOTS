@@ -262,6 +262,42 @@ namespace MaxyGames.UNode {
 				throw new Exception("Invalid context of node with Auto execution mode. It should be used inside a system On Update event, IJobEntity or IJobChunk graph.");
 			}
 		}
+		public static string GetComponentTypeHandle(NodeObject nodeObject, Type ComponentType, PortAccessibility accessibility) {
+			GetECSCommand(nodeObject, out var entities, out var commandName, out var commandType, autoRegisterVariableInJob: false, isValue: true);
+			if(commandType == typeof(EntityManager)) {
+				return CG.Invoke(typeof(SystemAPI), nameof(SystemAPI.GetComponentTypeHandle),
+					new[] { ComponentType },
+					accessibility == PortAccessibility.ReadOnly ? true.CGValue() : null);
+			}
+			else if(commandType == typeof(EntityCommandBuffer) || commandType == typeof(EntityCommandBuffer.ParallelWriter)) {
+				var variables = entities.JobVariables;
+				if(variables != null) {
+					return GetComponentTypeHandle(ComponentType, variables, accessibility, commandType == typeof(EntityCommandBuffer.ParallelWriter));
+				}
+				else {
+					throw null;
+				}
+			}
+			else {
+				throw new Exception("Invalid context of node with Auto execution mode. It should be used inside a system On Update event, IJobEntity or IJobChunk graph.");
+			}
+		}
+
+		public static string GetComponentTypeHandle(Type componentType, List<ECSJobVariable> variables, PortAccessibility accessibility, bool parallel = false) {
+			var nm = componentType.Name + "TypeHandle";
+			var lookupType = typeof(ComponentTypeHandle<>).MakeGenericType(componentType);
+			return GetVariableCodeValue(
+				nm,
+				lookupType,
+				CG.Invoke(
+					typeof(SystemAPI),
+					nameof(SystemAPI.GetComponentTypeHandle),
+					new[] { componentType },
+					accessibility == PortAccessibility.ReadOnly ? CG.Value(true) : null),
+				variables,
+				accessibility,
+				parallel);
+		}
 
 		public static string GetComponentLookup(NodeObject nodeObject, Type ComponentType, PortAccessibility accessibility) {
 			GetECSCommand(nodeObject, out var entities, out var commandName, out var commandType, autoRegisterVariableInJob: false, isValue: true);
@@ -273,7 +309,7 @@ namespace MaxyGames.UNode {
 			else if(commandType == typeof(EntityCommandBuffer) || commandType == typeof(EntityCommandBuffer.ParallelWriter)) {
 				var variables = entities.JobVariables;
 				if(variables != null) {
-					return GetComponentLookup(commandType, variables, accessibility, commandType == typeof(EntityCommandBuffer.ParallelWriter));
+					return GetComponentLookup(ComponentType, variables, accessibility, commandType == typeof(EntityCommandBuffer.ParallelWriter));
 				}
 				else {
 					throw null;

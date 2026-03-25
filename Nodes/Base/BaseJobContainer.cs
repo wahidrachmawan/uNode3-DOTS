@@ -41,7 +41,7 @@ namespace MaxyGames.UNode.Nodes {
 
 		public virtual string Title => name;
 
-		public string Scope => "ECS_Job";
+		public string Scope => "ECS_Job" + NodeScope.OR + NodeScope.FlowGraph;
 
 		public virtual ECSLogicExecutionMode LogicExecutionMode => executionMode;
 
