@@ -16,7 +16,12 @@ namespace MaxyGames.UNode.Nodes {
 			Schedule,
 			ScheduleParallel,
 		}
-
+		public enum IndexKind {
+			None = 0,
+			ChunkIndexInQuery = 1,
+			EntityIndexInChunk = 2,
+			EntityIndexInQuery = 4,
+		}
 		public enum DataKind {
 			ReadOnlyComponent,
 			ReadWriteComponent,
@@ -40,12 +45,14 @@ namespace MaxyGames.UNode.Nodes {
 		public RunKind runOn = RunKind.Run;
 		public bool burstCompile;
 		public EntityQueryOptions options = EntityQueryOptions.Default;
+		public IndexKind indexKind = IndexKind.None;
 
 		public List<ECSQueryFilter> queryFilters = new List<ECSQueryFilter>();
 		public List<SerializedType> withSharedComponentFilter = new List<SerializedType>();
 
 		public ValueOutput entity { get; private set; }
 		public FlowOutput body { get; private set; }
+		public ValueOutput index { get; private set; }
 		public ValueOutput chunkIndexInQuery { get; private set; }
 		public List<ECSJobVariable> JobVariables => CG.GetUserObject<List<ECSJobVariable>>(nodeObject);
 
@@ -68,7 +75,10 @@ namespace MaxyGames.UNode.Nodes {
 				data.port = ValueOutput(data.id, () => data.IsEnableableQuery ? typeof(bool) : data.type, PortAccessibility.ReadWrite).SetName(!string.IsNullOrEmpty(data.name) ? data.name : ("Item" + (i + 1)));
 				data.port.canSetValue = () => data.kind == DataKind.ReadWriteComponent || data.kind == DataKind.ReadWriteEnableableComponent;
 			}
-			if(runOn == RunKind.ScheduleParallel) {
+			if(indexKind != IndexKind.None && indexKind != IndexKind.ChunkIndexInQuery) {
+				index = ValueOutput(nameof(index), typeof(int)).SetName("index");
+			}
+			if(runOn == RunKind.ScheduleParallel || indexKind == IndexKind.ChunkIndexInQuery) {
 				chunkIndexInQuery = ValueOutput(nameof(chunkIndexInQuery), typeof(int)).SetName("chunkIndexInQuery");
 				chunkIndexInQuery.SetTooltip("Used as the chunk index inside the current query.");
 			}
@@ -220,6 +230,13 @@ namespace MaxyGames.UNode.Nodes {
 			if(variableNames.Count > 1) {
 				foreachVarNames = foreachVarNames.Wrap();
 			}
+			if(index != null && index.hasValidConnections) {
+				return CG.Flow(
+					CG.DeclareVariable(index, 0.CGValue()),
+					CG.Foreach(null, foreachVarNames, iterator, CG.Flow(CG.Flow(body), CG.Set(CG.GetVariableName(index), 1, SetType.Add))),
+					CG.FlowFinish(enter, exit)
+				);
+			}
 			return CG.Flow(
 				CG.Foreach(null, foreachVarNames, iterator, CG.Flow(body)),
 				CG.FlowFinish(enter, exit)
@@ -239,6 +256,10 @@ namespace MaxyGames.UNode.Nodes {
 			if(chunkIndexInQuery != null) {
 				var vName = CG.RegisterVariable(chunkIndexInQuery);
 				CG.RegisterPort(chunkIndexInQuery, () => vName);
+			}
+			if(index != null && index.hasValidConnections) {
+				var vName = CG.RegisterVariable(index);
+				CG.RegisterPort(index, () => vName);
 			}
 			var targetBody = body.GetTargetNode();
 			string className = CG.GetUserObject<string>(this);
@@ -323,6 +344,9 @@ namespace MaxyGames.UNode.Nodes {
 			}
 
 			CG.RegisterPostGeneration((classData) => {
+				if(CG.IsFlowRegistered(enter) == false) {
+					return;
+				}
 				//Create class
 				var classBuilder = new CG.ClassData(className);
 				classBuilder.implementedInterfaces.Add(typeof(IJobEntity));
@@ -363,24 +387,6 @@ namespace MaxyGames.UNode.Nodes {
 				if(entity.hasValidConnections) {
 					parameters.Add(new CG.MPData(CG.GetVariableName(entity), typeof(Entity)));
 				}
-				//TODO: add support for index in IJobEntity
-				//if(index != null && index.hasValidConnections) {
-				//	CG.MPData paramData = new CG.MPData(CG.GetVariableName(index), typeof(int));
-
-				//	switch(indexKind) {
-				//		case IndexKind.Chunk:
-				//			paramData.RegisterAttribute(typeof(EntityIndexInChunk));
-				//			break;
-				//		case IndexKind.ChunkAndEntity:
-				//			paramData.RegisterAttribute(typeof(EntityIndexInChunk));
-				//			paramData.RegisterAttribute(typeof(EntityIndexInQuery));
-				//			break;
-				//		case IndexKind.Entity:
-				//			paramData.RegisterAttribute(typeof(EntityIndexInQuery));
-				//			break;
-				//	}
-				//	parameters.Add(paramData);
-				//}
 				for(int i = 0; i < variableNames.Count; i++) {
 					var data = datas[i];
 					if(data.type.type.IsValueType == false)
@@ -403,6 +409,22 @@ namespace MaxyGames.UNode.Nodes {
 				if(chunkIndexInQuery != null) {
 					CG.MPData paramData = new CG.MPData(CG.GetVariableName(chunkIndexInQuery), typeof(int));
 					paramData.RegisterAttribute(typeof(ChunkIndexInQuery));
+					parameters.Add(paramData);
+				}
+				if(index != null && index.hasValidConnections) {
+					CG.MPData paramData = new CG.MPData(CG.GetVariableName(index), typeof(int));
+
+					switch(indexKind) {
+						case IndexKind.ChunkIndexInQuery:
+							paramData.RegisterAttribute(typeof(ChunkIndexInQuery));
+							break;
+						case IndexKind.EntityIndexInQuery:
+							paramData.RegisterAttribute(typeof(EntityIndexInQuery));
+							break;
+						case IndexKind.EntityIndexInChunk:
+							paramData.RegisterAttribute(typeof(EntityIndexInChunk));
+							break;
+					}
 					parameters.Add(paramData);
 				}
 				method.parameters = parameters;
@@ -491,6 +513,7 @@ namespace MaxyGames.UNode.Editors {
 				UInspector.Draw(option.property[nameof(node.burstCompile)]);
 			}
 			UInspector.Draw(option.property[nameof(node.options)]);
+			UInspector.Draw(option.property[nameof(node.indexKind)]);
 
 			uNodeGUI.DrawCustomList(node.datas, "Query",
 				drawElement: (position, index, value) => {
