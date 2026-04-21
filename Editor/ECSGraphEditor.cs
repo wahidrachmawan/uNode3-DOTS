@@ -61,9 +61,10 @@ namespace MaxyGames.UNode.Editors {
 				}
 			}
 			if(popupIndex == 0) {
-				uNodeGUIUtility.DrawTypeDrawer(uNodeGUIUtility.GetRect(), asset.inheritType, new GUIContent("Inherit From"), (type) => {
-					asset.inheritType = type;
-				}, inheritFilter, asset);
+				//TODO: make inheritance support for ECS graph
+				//uNodeGUIUtility.DrawTypeDrawer(uNodeGUIUtility.GetRect(), asset.inheritType, new GUIContent("Inherit From"), (type) => {
+				//	asset.inheritType = type;
+				//}, inheritFilter, asset);
 			}
 			else {
 				uNodeGUIUtility.ShowField(nameof(asset.burstCompile), asset, asset);
