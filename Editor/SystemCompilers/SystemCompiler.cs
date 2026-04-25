@@ -25,7 +25,6 @@ namespace MaxyGames.UNode.Editors {
 
 		public static string OutputProjectDirectory => GenerationUtility.generatedPath + Path.DirectorySeparatorChar + "ECS_System";
 
-		public static string CSXPath => ""; // Relative to project root
 		private static int m_fileIndex = 0;
 
 		internal static bool useAssemblyBuilder = false;
@@ -187,6 +186,7 @@ namespace MaxyGames.UNode.Editors {
 						return true;
 					}, static () => { });
 
+					Debug.Log("Starting compiling ECS Graphs...");
 					RoslynCodeCompiler.Run(option, result => {
 						try {
 							progresFinish = true;
@@ -235,6 +235,7 @@ namespace MaxyGames.UNode.Editors {
 		static List<string> m_AllSystemAssemblies = new();
 
 		internal static void NotifyBurst(string dllPath) {
+			if(loaderType == null || burstCompilerType == null) return;
 			var pdbPath = Path.ChangeExtension(dllPath, ".pdb");
 			if(RoslynUtility.AssemblyCSharp != null && File.Exists(dllPath) && File.Exists(pdbPath)) {
 				var destDllPath = Path.Combine(ScriptAssemlyPath, OutputName + (++m_BurstCompileIndex) + ".dll");
@@ -276,24 +277,20 @@ namespace MaxyGames.UNode.Editors {
 			}
 
 			static void NotifyCompilationStarted() {
-				if(loaderType == null || burstCompilerType == null) return;
 				var notifyCompilationStarted = burstCompilerType.GetMemberCached("NotifyCompilationStarted") as MethodInfo;
 				var getAssemblyFolders = loaderType.GetMemberCached("GetAssemblyFolders") as MethodInfo;
 				notifyCompilationStarted.InvokeOptimized(null, getAssemblyFolders.InvokeOptimized(null), new string[0]);
 			}
 
 			static void NotifyAssemblyCompilationFinished(string path, string[] defines) {
-				if(loaderType == null || burstCompilerType == null) return;
 				burstCompilerType.GetMemberCached("NotifyAssemblyCompilationFinished").ConvertTo<MethodInfo>().InvokeOptimized(null, Path.GetFileNameWithoutExtension(path), defines);
 			}
 
 			static void NotifyAssemblyCompilationNotRequired(string path) {
-				if(loaderType == null || burstCompilerType == null) return;
 				burstCompilerType.GetMemberCached("NotifyAssemblyCompilationNotRequired").ConvertTo<MethodInfo>().InvokeOptimized(null, Path.GetFileNameWithoutExtension(path));
 			}
 
 			static void NotifyCompilationFinished() {
-				if(loaderType == null || burstCompilerType == null) return;
 				burstCompilerType.GetMemberCached("NotifyCompilationFinished").ConvertTo<MethodInfo>().InvokeOptimized(null);
 			}
 		}

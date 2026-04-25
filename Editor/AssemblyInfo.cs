@@ -3,6 +3,14 @@ using Unity.Entities;
 using Unity.Jobs;
 using System;
 using System.Reflection;
+using Unity.Collections;
+using UnityEngine;
+using Unity.Mathematics;
+using Unity.Transforms;
+
+[assembly: TypeIcons.RegisterIconGuid(typeof(LocalToWorld), "26a9c54ad253e6e48bd566e538386094")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(LocalTransform), "0d9e7052d10f7ec449636f01da8a6f96")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(Parent), "d35a09adc97b7a14a92953fbaeebe8d7")]
 
 [assembly: TypeIcons.RegisterIconGuid(typeof(Entity), "1649a5c109aae6642a01b83de611d8a4")]
 [assembly: TypeIcons.RegisterIconGuid(typeof(EntityQuery), "ba164113c38602b4da035d272adcd15d")]
@@ -19,8 +27,21 @@ using System.Reflection;
 [assembly: TypeIcons.RegisterIconGuid(typeof(IJobChunk), "06485293297100e45b9d127ec43e7ae3", true)]
 [assembly: TypeIcons.RegisterIconGuid(typeof(ComponentSystemBase), "9b88b1c74c6a1244b97f851a405560c9", true)]
 [assembly: TypeIcons.RegisterIconGuid(typeof(World), "ecd7ff483d6525148a2edf22cfa6034e", true)]
-
 [assembly: TypeIcons.RegisterIconGuid(typeof(EntityArchetype), "84ea9d5414135e7428961d0e3609c7e7")]
+[assembly: TypeIcons.RegisterIconGuid(null, null, typeIconSelector = typeof(MaxyGames.UNode.Editors.TypeIconFilter.TypeIconSelector))]
+
+[assembly: TypeIcons.RegisterIconGuid(typeof(bool2), "39e23c2649b464f45b26f3f696dafe58")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(bool2x2), "93d9e29a9fd5be34888fa6916d9016c2")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(bool2x3), "b3079250e3e6787438e7345ce801ccc2")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(bool2x4), "57e7b0bf8993c1846b4705be899c35ad")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(bool3), "dd5b8996171242645ace8ed4c7dc277d")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(bool4), "e7e055c3f77e8c64f83093e81e050bfb")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(float2), "8e435ee5b0797824c9774f4072f94170")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(float3), "54a371dc96e86724fad7b24ac83383ba")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(float4), "5ff09c764c2256e49b49a0b4a34b7e44")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(int2), "5138491f87f9574488e5396c90ce7cea")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(int3), "3bdb7826b4cb4a0489f0a00586f0f35a")]
+[assembly: TypeIcons.RegisterIconGuid(typeof(int4), "254dc6d6291ccb2458309f8e393a5852")]
 
 namespace MaxyGames.UNode.Editors {
 	static class TypeIconFilter {
@@ -34,6 +55,36 @@ namespace MaxyGames.UNode.Editors {
 		public sealed class ManagedComponentFilter : TypeIcons.ITypeIconFilter {
 			public bool IsValid(Type type) {
 				return type.IsClass;
+			}
+		}
+		public sealed class TypeIconSelector : TypeIcons.ITypeIconSelector {
+			public Texture nativeArrayIcon;
+			public Texture nativeListIcon;
+
+			public TypeIconSelector() {
+				nativeArrayIcon = uNodeEditorUtility.Icons.GetIconByGuid("4275ba9e04141814d864f80ad1142814");
+				nativeListIcon = uNodeEditorUtility.Icons.GetIconByGuid("10348a0ba96fb9041a4ddc5e6a2b3f82");
+			}
+
+			public Texture GetIcon(Type type) {
+				if(type.IsValueType && type.IsGenericType) {
+					if(type.IsConstructedGenericType) {
+						type = type.GetGenericTypeDefinition();
+						if(type == typeof(NativeArray<>)) {
+							return nativeArrayIcon;
+						}
+						else if(type == typeof(NativeList<>)) {
+							return nativeListIcon;
+						}
+					}
+					else if(type == typeof(NativeArray<>)) {
+						return nativeArrayIcon;
+					}
+					else if(type == typeof(NativeList<>)) {
+						return nativeListIcon;
+					}
+				}
+				return null;
 			}
 		}
 	}
