@@ -1,12 +1,12 @@
-# uNode3-DOTS
+# uNode 3 DOTS
 uNode 3 Support for Unity DOTS / ECS
 
 ## **Setup**
 
 ### Requirements
-* Unity 6.3 or later
+* Unity 6.4 or later
 * Unity Entities 1.0.14 or later
-* uNode v3.2.9 or later
+* uNode v3.2.10 or later
 
 ### Installation
 
@@ -27,3 +27,7 @@ Alternatively, open Packages/manifest.json and add the following to the dependen
     }
 }
 ```
+
+## Samples
+
+- https://github.com/wahidrachmawan/ECS-Samples
