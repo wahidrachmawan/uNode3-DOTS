@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace MaxyGames.UNode.Nodes {
 	[NodeMenu("ECS/Flow", "SetBuffer", scope = NodeScope.ECSGraphAndJob, hasFlowInput = true, hasFlowOutput = true, inputs = new[] { typeof(Entity), typeof(IBufferElementData) })]
-	public class SetBuffer : ECSNode {
+	public class SetBuffer : ECSFlowNode {
 		[Filter(typeof(IBufferElementData), DisplayAbstractType = false)]
 		public SerializedType type = SerializedType.None;
 

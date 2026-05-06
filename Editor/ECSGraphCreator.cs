@@ -84,6 +84,23 @@ namespace MaxyGames.UNode.Editors {
 		public override void OnGUI() {
 			base.OnGUI();
 			uNodeGUIUtility.ShowField(nameof(componentKind), this);
+
+			uNodeGUI.DrawCustomList(graphVariables, "Variables",
+				(position, index, value) => {
+					position.height = EditorGUIUtility.singleLineHeight;
+					value.name = EditorGUI.TextField(position, "Name", value.name);
+					position.y += EditorGUIUtility.singleLineHeight + 1;
+					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Type"), type => {
+						value.type = type;
+					}, FilterAttribute.DefaultTypeFilter);
+				},
+				add: _ => {
+					graphVariables.Add(new VariableData("newVariable", typeof(float), 0));
+				},
+				remove: index => graphVariables.RemoveAt(index),
+				elementHeight: _ => EditorGUIUtility.singleLineHeight * 2 + 2
+			);
+
 			DrawGraphLayout();
 		}
 
@@ -101,6 +118,11 @@ namespace MaxyGames.UNode.Editors {
 						typeof(IEnableableComponent)
 					};
 					break;
+			}
+			if(graphVariables.Count > 0) {
+				foreach(var var in graphVariables) {
+					graph.GraphData.variableContainer.AddVariable(var.name, var.type, var.value);
+				}
 			}
 			graph.GraphData.graphLayout = graphLayout;
 			return graph;

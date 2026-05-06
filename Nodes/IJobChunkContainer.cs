@@ -120,16 +120,6 @@ namespace MaxyGames.UNode.Editors {
 	using UnityEngine.UIElements;
 
 	class IJobChunkContainerDrawer : UGraphElementDrawer<Nodes.IJobChunkContainer> {
-		static readonly FilterAttribute componentFilter;
-
-		static IJobChunkContainerDrawer() {
-			componentFilter = new FilterAttribute(typeof(IComponentData), typeof(IQueryTypeParameter)) {
-				DisplayInterfaceType = false,
-				DisplayReferenceType = true,
-				DisplayValueType = true,
-			};
-		}
-
 		public override void DrawLayouted(DrawerOption option) {
 			var container = GetValue(option);
 
@@ -157,7 +147,7 @@ namespace MaxyGames.UNode.Editors {
 				},
 				add: position => {
 					option.RegisterUndo();
-					container.variableDatas.Add(new Nodes.BaseJobContainer.VData());
+					container.variableDatas.Add(new BaseJobContainer.VData());
 					container.Entry.Register();
 					uNodeGUIUtility.GUIChanged(container, UIChangeType.Important);
 					uNodeGUIUtility.GUIChanged(container.Entry, UIChangeType.Average);

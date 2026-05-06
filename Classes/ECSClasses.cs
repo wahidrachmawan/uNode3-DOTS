@@ -61,10 +61,6 @@ namespace MaxyGames.UNode {
 		public SerializedType type = typeof(IComponentData);
 	}
 
-	public interface IECSNode {
-
-	}
-
 	[Serializable]
 	public class SystemOrderData {
 		public SystemOrderKind kind;
@@ -139,6 +135,29 @@ namespace MaxyGames.UNode {
 						var graph = nodeObject.graphContainer as ECSGraph;
 						var contents = CG.DeclareVariable(result, CG.Access(graph.CodegenStateName).CGAccess("EntityManager"));
 						mdata.AddCode(contents, -1000);
+					});
+				}
+				return result;
+			}
+			return null;
+		}
+
+		public static string RegisterLocalVariable(object owner, string name, Type type, string value) {
+			if(CG.isGenerating) {
+				var result = CG.GetUserObject<string>((owner, "LocalVars", type));
+				if(result == null) {
+					result = CG.GenerateNewName(name);
+					CG.RegisterUserObject(result, (owner, "LocalVars", type));
+
+					CG.RegisterPostClassManipulator(data => {
+						data.AddVariable(new CG.VData(result, type, autoCorrection: false));
+
+						var mdata = data.GetMethodData(nameof(ISystem.OnUpdate));
+						if(mdata == null)
+							throw new Exception($"There's no {nameof(ISystem.OnUpdate)} event/function in a graph");
+
+						var contents = CG.Set(result, value);
+						mdata.AddCode(contents, -10);
 					});
 				}
 				return result;

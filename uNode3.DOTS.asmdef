@@ -1,6 +1,6 @@
 {
     "name": "uNode3.DOTS",
-    "rootNamespace": "",
+    "rootNamespace": "MaxyGames.UNode",
     "references": [
         "GUID:23f89c042fe722143bc304ac73a6ffa8",
         "GUID:30976a8138310934cb73d24a5b8eea7d",
@@ -14,10 +14,10 @@
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": true,
     "precompiledReferences": [],
-    "autoReferenced": false,
+    "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false

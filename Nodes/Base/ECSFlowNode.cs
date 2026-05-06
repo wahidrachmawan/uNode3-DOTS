@@ -6,8 +6,8 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Entities;
 
-namespace MaxyGames.UNode.Nodes {
-	public abstract class ECSNode : FlowNode {
+namespace MaxyGames.UNode {
+	public abstract class ECSFlowNode : FlowNode {
 		[Tooltip("The execution mode of the node. Auto will automatically determine the execution mode based on the context of the node. Run will execute the logic immediately, Schedule will schedule the logic to be executed later, ScheduleParallel will schedule the logic to be executed in parallel.")]
 		public ECSLogicExecutionMode executionMode = ECSLogicExecutionMode.Auto;
 		[Tooltip("If true, the execution will always use EntityCommandBuffer to schedule the execution later to safety execute from structural changes.")]

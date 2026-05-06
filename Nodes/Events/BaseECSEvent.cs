@@ -3,7 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using Unity.Entities;
 
-namespace MaxyGames.UNode.Nodes {
+namespace MaxyGames.UNode {
 	public abstract class BaseECSEvent : BaseGraphEvent {
 		public ValueOutput state { get; set; }
 

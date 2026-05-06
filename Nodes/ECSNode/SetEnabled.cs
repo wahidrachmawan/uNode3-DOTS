@@ -8,7 +8,7 @@ using Unity.Entities;
 
 namespace MaxyGames.UNode.Nodes {
 	[NodeMenu("ECS/Flow", "SetEnabled", scope = NodeScope.ECSGraphAndJob, hasFlowInput = true, hasFlowOutput = true, inputs = new[] { typeof(Entity), typeof(bool) })]
-	public class SetEnabled : ECSNode {
+	public class SetEnabled : ECSFlowNode {
 		[NonSerialized]
 		public ValueInput value;
 

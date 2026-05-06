@@ -174,7 +174,7 @@ namespace MaxyGames.UNode.Editors {
 					else {
 						if(nodeObject.graph.mainGraphContainer != null) {
 							GenericMenu menu = new GenericMenu();
-							foreach(var n in nodeObject.graph.mainGraphContainer.GetObjectsInChildren<Nodes.BaseJobContainer>()) {
+							foreach(var n in nodeObject.graph.mainGraphContainer.GetObjectsInChildren<BaseJobContainer>()) {
 								var jobNode = n;
 								menu.AddItem(new GUIContent(n.name), false, () => {
 									node.ReferenceNode = jobNode;
@@ -187,7 +187,7 @@ namespace MaxyGames.UNode.Editors {
 
 				element.AddManipulator(new ContextualMenuManipulator(evt => {
 					if(nodeObject.graph.mainGraphContainer != null) {
-						foreach(var n in nodeObject.graph.mainGraphContainer.GetObjectsInChildren<Nodes.BaseJobContainer>()) {
+						foreach(var n in nodeObject.graph.mainGraphContainer.GetObjectsInChildren<BaseJobContainer>()) {
 							var jobNode = n;
 							evt.menu.AppendAction(n.name, act => {
 								node.ReferenceNode = jobNode;

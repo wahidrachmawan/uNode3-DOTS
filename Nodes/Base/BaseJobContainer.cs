@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Entities;
 
-namespace MaxyGames.UNode.Nodes {
+namespace MaxyGames.UNode {
 	public abstract class BaseJobContainer : NodeContainerWithEntry, IEventGraphCanvas, INodeEntitiesForeach {
 		[Serializable]
 		public class VData {

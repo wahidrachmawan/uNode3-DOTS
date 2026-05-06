@@ -4,7 +4,7 @@ using Unity.Entities;
 
 namespace MaxyGames.UNode.Nodes {
 	[NodeMenu("ECS/Flow", "SetComponent", scope = NodeScope.ECSGraphAndJob, hasFlowInput = true, hasFlowOutput = true, inputs = new[] { typeof(IComponentData) })]
-	public class SetComponent : ECSNode {
+	public class SetComponent : ECSFlowNode {
 		[NonSerialized]
 		public ValueInput component;
 
