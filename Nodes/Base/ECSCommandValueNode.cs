@@ -1,13 +1,9 @@
 using UnityEngine;
 using System;
-using System.Linq;
-using System.Reflection;
-using System.Collections;
-using System.Collections.Generic;
 using Unity.Entities;
 
-namespace MaxyGames.UNode {
-	public abstract class ECSFlowNode : FlowNode {
+namespace MaxyGames.UNode.Nodes {
+	public abstract class ECSCommandValueNode : ValueNode {
 		[Tooltip("The execution mode of the node. Auto will automatically determine the execution mode based on the context of the node. Run will execute the logic immediately, Schedule will schedule the logic to be executed later, ScheduleParallel will schedule the logic to be executed in parallel.")]
 		public ECSLogicExecutionMode executionMode = ECSLogicExecutionMode.Auto;
 		[Tooltip("If true, the execution will always use EntityCommandBuffer to schedule the execution later to safety execute from structural changes.")]
@@ -17,8 +13,6 @@ namespace MaxyGames.UNode {
 		public DefaultCommandBufferData defaultCommandBuffer;
 
 		[NonSerialized]
-		public ValueInput entity;
-		[NonSerialized]
 		public ValueInput entityManager;
 		[NonSerialized]
 		public ValueInput entityCommandBuffer;
@@ -27,9 +21,13 @@ namespace MaxyGames.UNode {
 		[NonSerialized]
 		public ValueInput sortKey;
 
+		protected virtual bool AlwaysUseSchedule => alwaysUseSchedule;
+		protected virtual bool AutoRegisterVariableInJob => true;
+
+		protected (INodeEntitiesForeach, string, Type) GetECSCommandData() => CG.GetUserObject<(INodeEntitiesForeach, string, Type)>(("ecs_command", this));
+
 		protected override void OnRegister() {
 			base.OnRegister();
-			entity = ValueInput(nameof(entity), typeof(Entity));
 
 			RegisterECSPort();
 
@@ -55,76 +53,21 @@ namespace MaxyGames.UNode {
 		/// </summary>
 		protected virtual void RegisterECSPort() { }
 
-		protected virtual bool IsValueECSNode => false;
-		protected virtual bool AlwaysUseSchedule => alwaysUseSchedule;
-
 		public override void OnGeneratorInitialize() {
 			base.OnGeneratorInitialize();
 			if(executionMode == ECSLogicExecutionMode.Auto) {
-				ECSGraphUtility.GetECSCommand(this, out var entities, out var commandName, out var commandType, 
-					isValue: IsValueECSNode, 
-					alwaysUseSchedule: AlwaysUseSchedule, 
+				ECSGraphUtility.GetECSCommand(this, out var entities, out var commandName, out var commandType,
+					isValue: true,
+					alwaysUseSchedule: AlwaysUseSchedule,
+					autoRegisterVariableInJob: AutoRegisterVariableInJob,
 					ecbType: defaultCommandBuffer.GetEntityCommandBufferSingletonType(nodeObject.graphContainer as ECSGraph));
 				CG.RegisterUserObject<(INodeEntitiesForeach, string, Type)>((entities, commandName, commandType), ("ecs_command", this));
 			}
 		}
 
-		protected string GenerateFlowInvokeCode(string functionName, Type[] genericParameterTypes, params string[] parameters) {
-			return GenerateInvokeCode(mode => (functionName, genericParameterTypes, parameters)).AddSemicolon();
-		}
-
-		protected string GenerateFlowInvokeCode(Func<ECSLogicExecutionMode, (string name, Type[] genericParameterTypes, string[] parameters)> function) {
-			return GenerateInvokeCode(function).AddSemicolon();
-		}
-
-		protected string GenerateInvokeCode(string functionName, Type[] genericParameterTypes, params string[] parameters) {
-			return GenerateInvokeCode(mode => (functionName, genericParameterTypes, parameters));
-		}
-
-		protected virtual string GenerateInvokeCode(Func<ECSLogicExecutionMode, (string name, Type[] genericParameterTypes, string[] parameters)> function) {
-			if(executionMode == ECSLogicExecutionMode.Auto) {
-				var (entities, commandName, commandType) = CG.GetUserObject<(INodeEntitiesForeach, string, Type)>(("ecs_command", this));
-				//ECSGraphUtility.GetECSCommand(this, out var entities, out var commandName, out var commandType);
-				if(commandType == typeof(EntityManager)) {
-					var (name, gtype, parameters) = function(ECSLogicExecutionMode.Run);
-					return commandName.CGInvoke(name, gtype, parameters);
-				}
-				else if(commandType == typeof(EntityCommandBuffer)) {
-					var (name, gtype, parameters) = function(ECSLogicExecutionMode.Schedule);
-					return commandName.CGInvoke(name, gtype, parameters);
-				}
-				else if(commandType == typeof(EntityCommandBuffer.ParallelWriter)) {
-					var (name, gtype, parameters) = function(ECSLogicExecutionMode.ScheduleParallel);
-					return commandName.CGInvoke(name, gtype, new[] { entities.GenerateParallelIndex() }.Concat(parameters).ToArray());
-				}
-				else {
-					throw new Exception("Invalid context of node with Auto execution mode. It should be used inside a system On Update event, IJobEntity or IJobChunk graph.");
-				}
-			} else {
-				switch(executionMode) {
-					case ECSLogicExecutionMode.Run: {
-						var commandName = CG.GeneratePort(entityManager);
-						var (name, gtype, parameters) = function(ECSLogicExecutionMode.Run);
-						return commandName.CGInvoke(name, gtype, parameters);
-					}
-					case ECSLogicExecutionMode.Schedule: {
-						var commandName = CG.GeneratePort(entityCommandBuffer);
-						var (name, gtype, parameters) = function(ECSLogicExecutionMode.Schedule);
-						return commandName.CGInvoke(name, gtype, parameters);
-					}
-					case ECSLogicExecutionMode.ScheduleParallel: {
-						var commandName = CG.GeneratePort(parallelWriter);
-						var (name, gtype, parameters) = function(ECSLogicExecutionMode.ScheduleParallel);
-						return commandName.CGInvoke(name, gtype, new[] { sortKey.CGValue() }.Concat(parameters).ToArray());
-					}
-				}
-			}
-			throw new NotImplementedException();
-		}
-
 		protected virtual string GenerateInvokeCode(Func<(ECSLogicExecutionMode mode, string commandName, string entityIndex), string> function) {
 			if(executionMode == ECSLogicExecutionMode.Auto) {
-				var (entities, commandName, commandType) = CG.GetUserObject<(INodeEntitiesForeach, string, Type)>(("ecs_command", this));
+				var (entities, commandName, commandType) = GetECSCommandData();
 				if(commandType == typeof(EntityManager)) {
 					return function((ECSLogicExecutionMode.Run, commandName, null));
 				}
@@ -157,4 +100,5 @@ namespace MaxyGames.UNode {
 			throw new NotImplementedException();
 		}
 	}
+
 }

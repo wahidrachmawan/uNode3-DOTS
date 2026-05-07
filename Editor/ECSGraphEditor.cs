@@ -49,6 +49,9 @@ namespace MaxyGames.UNode.Editors {
 				uNodeEditorUtility.MarkDirty(asset);
 			});
 			uNodeGUIUtility.ShowField(nameof(asset.modifier), asset, asset);
+			uNodeGUIUtility.EditValueLayouted(new GUIContent("Default Command Buffer"), asset.defaultCommandBuffer.kind, val => {
+				asset.defaultCommandBuffer.kind = val;
+			});
 
 			int popupIndex = asset.inheritType == typeof(ValueType) ? 1 : 0;
 			var newPopupIndex = EditorGUILayout.Popup(new GUIContent("System Kind"), popupIndex, new[] { "SystemBase", "ISystem" });

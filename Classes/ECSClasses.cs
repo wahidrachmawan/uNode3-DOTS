@@ -49,6 +49,88 @@ namespace MaxyGames.UNode {
 		None,
 	}
 
+	public enum DefaultCommandBufferType {
+		/// <summary>
+		/// Will relative to graph default command buffer, but if the graph also default it is same as BeginSimulation.
+		/// </summary>
+		Default = 0,
+		/// <summary>
+		/// Create a new command buffer and playback at the end of update
+		/// </summary>
+		ImmediatePlayback,
+		/// <summary>
+		/// Start of Simulation group
+		/// </summary>
+		BeginSimulation,
+		/// <summary>
+		/// End of Simulation group
+		/// </summary>
+		EndSimulation,
+		/// <summary>
+		/// Start of Initialization group
+		/// </summary>
+		BeginInitialization,
+		/// <summary>
+		/// End of Initialization group
+		/// </summary>
+		EndInitialization,
+		/// <summary>
+		/// Start of FixedStep group
+		/// </summary>
+		BeginFixedStepSimulation,
+		/// <summary>
+		/// End of FixedStep group
+		/// </summary>
+		EndFixedStepSimulation,
+		/// <summary>
+		/// Start of Presentation group
+		/// </summary>
+		BeginPresentation,
+		///// <summary>
+		///// End of Presentation group
+		///// </summary>
+		//EndPresentation,
+		//TODO: add support for custom entity command buffer
+		///// <summary>
+		///// A custom entity command buffer
+		///// </summary>
+		//Custom,
+	}
+
+	public struct DefaultCommandBufferData {
+		public DefaultCommandBufferType kind;
+		//[Filter(typeof(EntityCommandBufferSystem))]
+		//public SerializedType type;
+
+		public Type GetEntityCommandBufferSingletonType(ECSGraph graph) {
+			switch(kind) {
+				case DefaultCommandBufferType.Default: {
+					if(graph != null && graph.defaultCommandBuffer.kind != DefaultCommandBufferType.Default) {
+						return graph.defaultCommandBuffer.GetEntityCommandBufferSingletonType(null);
+					}
+					goto case DefaultCommandBufferType.BeginSimulation;
+				}
+				case DefaultCommandBufferType.BeginSimulation:
+					return typeof(BeginSimulationEntityCommandBufferSystem.Singleton);
+				case DefaultCommandBufferType.EndSimulation:
+					return typeof(EndSimulationEntityCommandBufferSystem.Singleton);
+				case DefaultCommandBufferType.BeginInitialization:
+					return typeof(BeginInitializationEntityCommandBufferSystem.Singleton);
+				case DefaultCommandBufferType.EndInitialization:
+					return typeof(EndInitializationEntityCommandBufferSystem.Singleton);
+				case DefaultCommandBufferType.BeginFixedStepSimulation:
+					return typeof(BeginFixedStepSimulationEntityCommandBufferSystem.Singleton);
+				case DefaultCommandBufferType.EndFixedStepSimulation:
+					return typeof(EndFixedStepSimulationEntityCommandBufferSystem.Singleton);
+				case DefaultCommandBufferType.BeginPresentation:
+					return typeof(BeginPresentationEntityCommandBufferSystem.Singleton);
+					//case DefaultCommandBufferType.EndPresentation:
+					//	return typeof(EndPresentationEntityCommandBufferSystem.Singleton);
+			}
+			return typeof(EntityCommandBuffer);
+		}
+	}
+
 	[Serializable]
 	public class ECSQueryFilter {
 		public QueryFilter filter;
@@ -96,10 +178,10 @@ namespace MaxyGames.UNode {
 	}
 
 	public enum LookupExecutionKind {
-		Auto,
-		SystemAPI,
-		EntityManager,
-		Lookup,
+		Auto = 0,
+		SystemAPI = 1 << 0,
+		EntityManager = 1 << 1,
+		Lookup = 1 << 2,
 	}
 
 	public class ECSJobVariable {
@@ -142,7 +224,7 @@ namespace MaxyGames.UNode {
 			return null;
 		}
 
-		public static string RegisterLocalVariable(object owner, string name, Type type, string value) {
+		public static string RegisterLocalVariable(object owner, string name, Type type, Func<string> value) {
 			if(CG.isGenerating) {
 				var result = CG.GetUserObject<string>((owner, "LocalVars", type));
 				if(result == null) {
@@ -156,7 +238,7 @@ namespace MaxyGames.UNode {
 						if(mdata == null)
 							throw new Exception($"There's no {nameof(ISystem.OnUpdate)} event/function in a graph");
 
-						var contents = CG.Set(result, value);
+						var contents = CG.Set(result, value());
 						mdata.AddCode(contents, -10);
 					});
 				}
@@ -189,16 +271,6 @@ namespace MaxyGames.UNode {
 		}
 
 		/// <summary>
-		/// Retrieves the ECB singleton identifier for the specified type and node object.
-		/// </summary>
-		/// <typeparam name="T">The type implementing IECBSingleton.</typeparam>
-		/// <param name="nodeObject">The node object associated with the ECB singleton.</param>
-		/// <returns>The ECB singleton identifier as a string.</returns>
-		public static string GetECBSingleton<T>(NodeObject nodeObject) where T : IECBSingleton {
-			return GetECBSingleton(typeof(T), nodeObject);
-		}
-
-		/// <summary>
 		/// Retrieves the appropriate ECS command information for the specified node object, including the associated entities
 		/// foreach context, command name, and command type.
 		/// </summary>
@@ -207,7 +279,15 @@ namespace MaxyGames.UNode {
 		/// <param name="commandName">When this method returns, contains the name of the ECS command variable.</param>
 		/// <param name="commandType">When this method returns, contains the type of the ECS command.</param>
 		/// <param name="autoRegisterVariableInJob">true to automatically register the command variable in the job; otherwise, false.</param>
-		public static void GetECSCommand(NodeObject nodeObject, out INodeEntitiesForeach entitiesForeach, out string commandName, out Type commandType, bool autoRegisterVariableInJob = true, bool isValue = false, bool alwaysUseSchedule = false) {
+		public static void GetECSCommand(NodeObject nodeObject, out INodeEntitiesForeach entitiesForeach, out string commandName, out Type commandType, bool autoRegisterVariableInJob = true, bool isValue = false, bool alwaysUseSchedule = false, Type ecbType = null) {
+			if(ecbType == null) {
+				if(nodeObject.graphContainer is ECSGraph graph) {
+					ecbType = graph.defaultCommandBuffer.GetEntityCommandBufferSingletonType(null);
+				}
+				else {
+					ecbType = typeof(BeginSimulationEntityCommandBufferSystem.Singleton);
+				}
+			}
 			commandName = null;
 			commandType = null;
 			var conenctions = CG.Nodes.FindAllConnections(nodeObject, false, false, true, isValue);
@@ -233,7 +313,7 @@ namespace MaxyGames.UNode {
 					entities is IJobEntityContainer jobEntity && 
 					jobEntity.indexKind.HasFlags(IJobEntityContainer.IndexKind.ChunkIndexInQuery)) {
 
-					var ecbName = GetECBSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>(nodeObject);
+					var ecbName = GetECBSingleton(ecbType, nodeObject);
 					if(autoRegisterVariableInJob) {
 						var variables = entities.JobVariables;
 						if(variables != null) {
@@ -241,7 +321,7 @@ namespace MaxyGames.UNode {
 								name = ecbName,
 								type = typeof(EntityCommandBuffer.ParallelWriter),
 								value = () => ecbName.CGInvoke(nameof(EntityCommandBuffer.AsParallelWriter)),
-								owner = typeof(BeginSimulationEntityCommandBufferSystem.Singleton),
+								owner = ecbType,
 							});
 						}
 					}
@@ -250,7 +330,7 @@ namespace MaxyGames.UNode {
 					return;
 				}
 				if(executionMode == ECSLogicExecutionMode.Auto || executionMode == ECSLogicExecutionMode.Schedule || alwaysUseSchedule) {
-					var ecbName = GetECBSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>(nodeObject);
+					var ecbName = GetECBSingleton(ecbType, nodeObject);
 					if(autoRegisterVariableInJob) {
 						var variables = entities.JobVariables;
 						if(variables != null) {
@@ -258,7 +338,7 @@ namespace MaxyGames.UNode {
 								name = ecbName,
 								type = typeof(EntityCommandBuffer),
 								value = () => ecbName,
-								owner = typeof(BeginSimulationEntityCommandBufferSystem.Singleton),
+								owner = ecbType,
 							});
 						}
 					}
@@ -276,7 +356,7 @@ namespace MaxyGames.UNode {
 			}
 			if(evt != null) {
 				if(alwaysUseSchedule) {
-					commandName = GetECBSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>(nodeObject);
+					commandName = GetECBSingleton(ecbType, nodeObject);
 					commandType = typeof(EntityCommandBuffer);
 				}
 				else {
@@ -286,7 +366,7 @@ namespace MaxyGames.UNode {
 			}
 			else {
 				if(alwaysUseSchedule) {
-					var ecbName = GetECBSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>(nodeObject);
+					var ecbName = GetECBSingleton(ecbType, nodeObject);
 					if(autoRegisterVariableInJob) {
 						var variables = entities.JobVariables;
 						if(variables != null) {
@@ -294,7 +374,7 @@ namespace MaxyGames.UNode {
 								name = ecbName,
 								type = typeof(EntityCommandBuffer),
 								value = () => ecbName,
-								owner = typeof(BeginSimulationEntityCommandBufferSystem.Singleton),
+								owner = ecbType,
 							});
 						}
 					}
@@ -502,6 +582,16 @@ namespace MaxyGames.UNode {
 		}
 
 		/// <summary>
+		/// Retrieves the ECB singleton identifier for the specified type and node object.
+		/// </summary>
+		/// <typeparam name="T">The type implementing IECBSingleton.</typeparam>
+		/// <param name="nodeObject">The node object associated with the ECB singleton.</param>
+		/// <returns>The ECB singleton identifier as a string.</returns>
+		public static string GetECBSingleton<T>(NodeObject nodeObject) where T : IECBSingleton {
+			return GetECBSingleton(typeof(T), nodeObject);
+		}
+
+		/// <summary>
 		/// Retrieves or creates a unique identifier for an ECB singleton associated with the specified type and node object
 		/// during code generation.
 		/// </summary>
@@ -511,26 +601,64 @@ namespace MaxyGames.UNode {
 		/// <exception cref="Exception">Thrown if the OnUpdate method is not found in the graph during post-class manipulation.</exception>
 		public static string GetECBSingleton(Type ecbType, NodeObject nodeObject) {
 			if(CG.isGenerating) {
-				var result = CG.GetUserObject<string>((nodeObject.graphContainer, "ECB-Singleton", ecbType));
-				if(result == null) {
-					result = CG.GenerateNewName("ecb");
-					CG.RegisterUserObject(result, (nodeObject.graphContainer, "ECB-Singleton", ecbType));
+				if(ecbType == null)
+					throw new ArgumentNullException(nameof(ecbType));
+				if(ecbType == typeof(EntityCommandBuffer)) {
+					var result = CG.GetUserObject<string>((nodeObject.graphContainer, "ECB-Singleton", ecbType));
+					if(result == null) {
+						result = CG.GenerateNewName("ecb");
+						CG.RegisterUserObject(result, (nodeObject.graphContainer, "ECB-Singleton", ecbType));
 
-					CG.RegisterPostClassManipulator(data => {
-						var mdata = data.GetMethodData(nameof(ISystem.OnUpdate));
-						if(mdata == null)
-							throw new Exception($"There's no {nameof(ISystem.OnUpdate)} event/function in a graph");
-						var graph = nodeObject.graphContainer as ECSGraph;
-						var contents = CG.DeclareVariable(
-							result,
-							typeof(SystemAPI)
-							.CGInvoke(nameof(SystemAPI.GetSingleton), new[] { ecbType }, null)
-							.CGInvoke("CreateCommandBuffer", graph.CodegenStateName.CGAccess(nameof(SystemState.WorldUnmanaged)))
-						);
-						mdata.AddCode(contents, -1000);
-					});
+						//We get it from this to ensure we register the entity manager
+						var em = GetEntityManager(nodeObject);
+
+						CG.RegisterPostClassManipulator(data => {
+							var mdata = data.GetMethodData(nameof(ISystem.OnUpdate));
+							if(mdata == null)
+								throw new Exception($"There's no {nameof(ISystem.OnUpdate)} event/function in a graph");
+							var graph = nodeObject.graphContainer as ECSGraph;
+							var contents = CG.DeclareVariable(
+								result,
+								CG.New(typeof(EntityCommandBuffer), CG.Value(Allocator.Temp))
+							);
+							mdata.AddCode(contents, -1000);
+
+							mdata.AddCode(
+								CG.Flow(
+									result.CGFlowInvoke(nameof(EntityCommandBuffer.Playback), em),
+									result.CGFlowInvoke(nameof(EntityCommandBuffer.Dispose))
+								),
+								int.MaxValue
+							);
+						});
+					}
+					return result;
 				}
-				return result;
+				else {
+					if(ecbType.IsCastableTo(typeof(IECBSingleton)) == false) {
+						throw new Exception("EntityCommandBuffer type should be implement: " + typeof(IECBSingleton).FullName);
+					}
+					var result = CG.GetUserObject<string>((nodeObject.graphContainer, "ECB-Singleton", ecbType));
+					if(result == null) {
+						result = CG.GenerateNewName("ecb");
+						CG.RegisterUserObject(result, (nodeObject.graphContainer, "ECB-Singleton", ecbType));
+
+						CG.RegisterPostClassManipulator(data => {
+							var mdata = data.GetMethodData(nameof(ISystem.OnUpdate));
+							if(mdata == null)
+								throw new Exception($"There's no {nameof(ISystem.OnUpdate)} event/function in a graph");
+							var graph = nodeObject.graphContainer as ECSGraph;
+							var contents = CG.DeclareVariable(
+								result,
+								typeof(SystemAPI)
+								.CGInvoke(nameof(SystemAPI.GetSingleton), new[] { ecbType }, null)
+								.CGInvoke("CreateCommandBuffer", graph.CodegenStateName.CGAccess(nameof(SystemState.WorldUnmanaged)))
+							);
+							mdata.AddCode(contents, -1000);
+						});
+					}
+					return result;
+				}
 			}
 			return null;
 		}

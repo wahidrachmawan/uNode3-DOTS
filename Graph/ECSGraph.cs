@@ -24,6 +24,8 @@ namespace MaxyGames.UNode {
 		public ClassModifier modifier = new ClassModifier() { Partial = true };
 		public SerializedType inheritType = typeof(ValueType);
 
+		public DefaultCommandBufferData defaultCommandBuffer = new() { kind = DefaultCommandBufferType.BeginSimulation };
+
 		public bool burstCompile = true;
 		public List<SerializedType> requiredForUpdates = new List<SerializedType>();
 		public List<SystemOrderData> systemOrder = new List<SystemOrderData>();
