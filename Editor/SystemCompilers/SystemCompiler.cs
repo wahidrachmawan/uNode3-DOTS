@@ -33,7 +33,7 @@ namespace MaxyGames.UNode.Editors {
 			public int callbackOrder => int.MinValue + 1000;
 
 			public void OnPreprocessBuild(BuildReport report) {
-				var graphs = GraphUtility.FindAllGraphAssets().Where(obj => obj.GetType().FullName == "MaxyGames.UNode.ECSGraph").ToArray();
+				var graphs = GraphEditorUtility.FindAllGraphAssets().Where(obj => obj.GetType().FullName == "MaxyGames.UNode.ECSGraph").ToArray();
 				var scripts = GenerationUtility.GenerateScriptForGraphs(graphs, "Build_ECS_System");
 				var dir = OutputProjectDirectory;
 				foreach(var script in scripts) {
@@ -71,7 +71,10 @@ namespace MaxyGames.UNode.Editors {
 		}
 
 		public static void GenerateAndCompileGraphs() {
-			var graphs = GraphUtility.FindAllGraphAssets().Where(obj => obj.GetType().FullName == "MaxyGames.UNode.ECSGraph").ToArray();
+			var graphs = GraphEditorUtility.FindAllGraphAssets().Where(obj => {
+				var name = obj.GetType().FullName;
+				return name == "MaxyGames.UNode.ECSGraph" || name == "MaxyGames.UNode.BehaviorTreeGraph";
+			}).ToArray();
 			var scripts = GenerationUtility.GenerateScriptForGraphs(graphs, "ECS_System");
 			CompileScripts(scripts.Select(s => GenerationUtility.GetGraphData(s.graphOwner).path).ToArray());
 		}
@@ -186,7 +189,7 @@ namespace MaxyGames.UNode.Editors {
 						return true;
 					}, static () => { });
 
-					Debug.Log("Starting compiling ECS Graphs...");
+					Debug.Log("Starting compiling graphs...");
 					RoslynCodeCompiler.Run(option, result => {
 						try {
 							progresFinish = true;
@@ -215,7 +218,7 @@ namespace MaxyGames.UNode.Editors {
 								}
 							}
 							else {
-								Debug.LogError("Compile failed");
+								Debug.LogError("Compile failed.\nError:" + string.Join("\n\n() => ", result.Errors.Select(e => e.message)));
 								callback?.Invoke(false);
 							}
 						}
@@ -224,6 +227,9 @@ namespace MaxyGames.UNode.Editors {
 						}
 					});
 				}
+				else {
+					Debug.LogError($"No Assembly-CSharp in project, compilation will be terminated.");
+				}
 			}
 		}
 
@@ -231,14 +237,14 @@ namespace MaxyGames.UNode.Editors {
 		static Type burstCompilerType => "Unity.Burst.BurstCompiler".ToType(false);
 
 		static DateTime m_LastCompiledTime;
-		static int m_BurstCompileIndex;
+		//static int m_BurstCompileIndex;
 		static List<string> m_AllSystemAssemblies = new();
 
 		internal static void NotifyBurst(string dllPath) {
 			if(loaderType == null || burstCompilerType == null) return;
 			var pdbPath = Path.ChangeExtension(dllPath, ".pdb");
 			if(RoslynUtility.AssemblyCSharp != null && File.Exists(dllPath) && File.Exists(pdbPath)) {
-				var destDllPath = Path.Combine(ScriptAssemlyPath, OutputName + (++m_BurstCompileIndex) + ".dll");
+				var destDllPath = Path.Combine(ScriptAssemlyPath, OutputName + /*(m_BurstCompileIndex) +*/ ".dll");
 				var destPdbPath = Path.ChangeExtension(destDllPath, ".pdb");
 
 				var lastWriteTime = File.GetLastWriteTime(dllPath);
@@ -254,7 +260,6 @@ namespace MaxyGames.UNode.Editors {
 					File.Copy(pdbPath, destPdbPath, true);
 
 					NotifyCompilationStarted();
-
 					foreach(var p in m_AllSystemAssemblies) {
 						var path = Path.GetFullPath(p);
 						//Debug.Log("Skipping system assembly for burst: " + path);
@@ -271,6 +276,20 @@ namespace MaxyGames.UNode.Editors {
 					}
 					NotifyAssemblyCompilationFinished(finishedPath, RoslynUtility.AssemblyCSharp.defines);
 					NotifyCompilationFinished();
+
+					//try {
+					//	if(File.Exists(oldDllPath)) {
+					//		File.Delete(oldDllPath);
+					//		var oldPdbPath = Path.ChangeExtension(oldDllPath, ".pdb");
+					//		if(File.Exists(oldPdbPath)) {
+					//			File.Delete(oldPdbPath);
+					//		}
+					//	}
+					//	else {
+					//		oldDllPath = null;
+					//	}
+					//}
+					//catch { }
 
 					m_AllSystemAssemblies.Add(destDllPath);
 				}

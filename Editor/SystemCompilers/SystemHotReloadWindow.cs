@@ -11,6 +11,13 @@ namespace MaxyGames.UNode.Editors {
 		[MenuItem("Tools/uNode ECS/System Hot Reload")]
 		public static void Open() => GetWindow<SystemHotReloadWindow>("System Hot Reload");
 
+		public static bool AutoInject {
+			get => EditorPrefs.GetBool("UNODE_DOTS_AUTO_INJECT", true);
+			set {
+				EditorPrefs.SetBool("UNODE_DOTS_AUTO_INJECT", value);
+			}
+		}
+
 		private ListView listView;
 
 		void OnEnable() {
@@ -38,13 +45,22 @@ namespace MaxyGames.UNode.Editors {
 				listView.RefreshItems();
 			}) { text = "UnInject Systems (Manual)" });
 
+			var toggle = new Toggle("Enable Auto Inject");
+			toggle.SetValueWithoutNotify(AutoInject);
+			toggle.RegisterValueChangedCallback(evt => {
+				AutoInject = evt.newValue;
+			});
+			root.Add(toggle);
+
 			root.Add(new Label("Active Systems:"));
 			root.Add(listView);
 			listView.RefreshItems();
 
 			var spacer = new VisualElement();
 			spacer.style.flexGrow = 1;
+
 			root.Add(spacer);
+
 			root.Add(new Button(() => {
 				Refresh();
 			}) { text = "Refresh" });

@@ -73,13 +73,11 @@ namespace MaxyGames.UNode.Nodes {
 				if(localVariables.Count > 0) {
 					for(int i = 0; i < localVariables.Count; i++) {
 						var data = localVariables[i];
-						classBuilder.RegisterVariable(
-							CG.DeclareVariable(
-								data.type,
-								data.name,
-								modifier: FieldModifier.PublicModifier,
-								attributes: data.attributes.Select(att => CG.Attribute(att)))
-							);
+						var vdata = new CG.VData(data.name, data.type) {
+							modifier = FieldModifier.PublicModifier,
+							attributes = data.attributes.Select(att => CG.AttributeData(att)),
+						};
+						classBuilder.RegisterVariable(vdata);
 					}
 				}
 
@@ -98,7 +96,7 @@ namespace MaxyGames.UNode.Nodes {
 				method.code = CG.GeneratePort(Entry.nodeObject.primaryFlowOutput);
 
 				//Register the generated function code
-				classBuilder.RegisterFunction(method.GenerateCode());
+				classBuilder.RegisterFunction(method);
 				//Register the generated type code
 				classData.RegisterNestedType(CG.WrapWithInformation(classBuilder.GenerateCode(), this));
 			});
@@ -120,10 +118,11 @@ namespace MaxyGames.UNode.Editors {
 	using UnityEngine.UIElements;
 
 	class IJobChunkContainerDrawer : UGraphElementDrawer<Nodes.IJobChunkContainer> {
-		public override void DrawLayouted(DrawerOption option) {
-			var container = GetValue(option);
+		public override void DrawLayouted(ref DrawerOption opt) {
+			var option = opt;
+			var container = GetValue(ref option);
 
-			DrawHeader(option);
+			DrawHeader(ref option);
 
 			UInspector.Draw(option.property[nameof(container.executionMode)]);
 
@@ -163,7 +162,7 @@ namespace MaxyGames.UNode.Editors {
 					return (EditorGUIUtility.singleLineHeight * 2) + 2;
 				});
 
-			DrawErrors(option);
+			DrawErrors(ref option);
 		}
 	}
 }

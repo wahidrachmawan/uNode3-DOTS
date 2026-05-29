@@ -358,15 +358,18 @@ namespace MaxyGames.UNode.Nodes {
 				if(localVariables.Count > 0) {
 					for(int i = 0; i < localVariables.Count; i++) {
 						var data = localVariables[i];
-						string content = CG.DeclareVariable(data.type, data.name, modifier: FieldModifier.PublicModifier/*, attributes: new[] { CG.Attribute(typeof(ReadOnlyAttribute)) }*/);
-						classBuilder.RegisterVariable(content);
+						var vdata = new CG.VData(data.name, data.type) {
+							modifier = FieldModifier.PublicModifier,
+						};
+						classBuilder.RegisterVariable(vdata);
+						//vdata.attributes = new[] { CG.Attribute(typeof(ReadOnlyAttribute)) };
 					}
 				}
 				if(usedFunctions.Count > 0) {
 					foreach(var func in usedFunctions) {
 						var data = CG.generatorData.GetMethodData(func);
 						if(data != null && data.modifier.Static == false) {
-							classBuilder.RegisterFunction(data.GenerateCode());
+							classBuilder.RegisterFunction(data);
 						}
 					}
 				}
@@ -374,7 +377,7 @@ namespace MaxyGames.UNode.Nodes {
 					foreach(var prop in usedProperties) {
 						var data = CG.generatorData.GetPropertyData(prop.name);
 						if(data != null && data.modifier.Static == false) {
-							classBuilder.RegisterProperty(data.GenerateCode());
+							classBuilder.RegisterProperty(data);
 						}
 					}
 				}
@@ -464,7 +467,7 @@ namespace MaxyGames.UNode.Nodes {
 				}
 
 				//Register the generated function code
-				classBuilder.RegisterFunction(method.GenerateCode());
+				classBuilder.RegisterFunction(method);
 				//Register the generated type code
 				classData.RegisterNestedType(CG.WrapWithInformation(classBuilder.GenerateCode(), this));
 			});
@@ -505,8 +508,9 @@ namespace MaxyGames.UNode.Editors {
 			};
 		}
 
-		public override void DrawLayouted(DrawerOption option) {
-			var node = GetNode(option);
+		public override void DrawLayouted(ref DrawerOption opt) {
+			var option = opt;
+			var node = GetNode(ref option);
 
 			UInspector.Draw(option.property[nameof(node.runOn)]);
 			if(node.runOn != Nodes.EntitiesForeach.RunKind.Run) {
@@ -601,9 +605,9 @@ namespace MaxyGames.UNode.Editors {
 
 			uNodeGUI.DrawTypeList("With Shared Component Filter", node.withSharedComponentFilter, sharedComponentFilter, node.GetUnityObject());
 
-			DrawInputs(option);
-			DrawOutputs(option);
-			DrawErrors(option);
+			DrawInputs(ref option);
+			DrawOutputs(ref option);
+			DrawErrors(ref option);
 		}
 	}
 }

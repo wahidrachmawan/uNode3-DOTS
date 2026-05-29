@@ -267,12 +267,12 @@ namespace MaxyGames.UNode.Editors {
 	using UnityEditor;
 
 	class ECSHighLevelNodeDrawer : NodeDrawer<ECSHighLevelNode> {
-		public override void DrawLayouted(DrawerOption option) {
-			var value = GetNode(option);
+		public override void DrawLayouted(ref DrawerOption option) {
+			var value = GetNode(ref option);
 			if(value != null) {
 				UInspector.DrawChilds(option.property["m_instance"]);
 			}
-			base.DrawLayouted(option);
+			base.DrawLayouted(ref option);
 		}
 	}
 }

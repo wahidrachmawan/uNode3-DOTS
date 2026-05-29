@@ -21,6 +21,7 @@ namespace MaxyGames.UNode.Editors {
 				}
 				else if(state == PlayModeStateChange.ExitingPlayMode) {
 					UninjectSystems();
+					//World.DisposeAllWorlds();
 				}
 			};
 		}
@@ -35,7 +36,10 @@ namespace MaxyGames.UNode.Editors {
 			public Unity.Collections.NativeList<TypeManager.SystemAttribute> UpdateInGroupAttributes => TypeManager.GetSystemAttributes(GetSystemTypeIndex, TypeManager.SystemAttributeKind.UpdateInGroup);
 		}
 
-		private static Assembly loadedAssembly;
+		private static Assembly loadedAssembly {
+			get => ECSRuntimeUtility.loadedAssembly;
+			set => ECSRuntimeUtility.loadedAssembly = value;
+		}
 		private static List<SystemData> allActiveSystems = new();
 		private static Action postAction;
 
@@ -58,7 +62,6 @@ namespace MaxyGames.UNode.Editors {
 				if(value == null) {
 					type.GetFieldCached("s_PendingRegistrations").SetValue(null, ReflectionUtils.CreateInstance(field.FieldType));
 				}
-				//type.GetFieldCached("s_StructTypes").SetValue(null, SerializerUtility.Duplicate(m_oldStructTypes));
 			};
 
 			SystemCompiler.NotifyBurst(path);
@@ -76,31 +79,51 @@ namespace MaxyGames.UNode.Editors {
 						}
 					}
 				}
-				if(type.IsCastableTo(typeof(ISystem))) {
-					postAction += () => TypeManager.GetSystemTypeIndex(type);
-					//Debug.Log(type);
-				}
-				else if(type.IsCastableTo(typeof(ComponentSystemBase))) {
-					postAction += () => TypeManager.GetSystemTypeIndex(type);
-					//var method = typeof(TypeManager).GetMemberCached("AddSystemTypeToTablesAfterInit") as MethodInfo;
-					//method.InvokeOptimized(null, type);
-				}
+				//if(type.IsCastableTo(typeof(ISystem))) {
+				//	//postAction += () => TypeManager.GetSystemTypeIndex(type);
+				//	//var method = typeof(TypeManager).GetMemberCached("AddSystemTypeToTablesAfterInit") as MethodInfo;
+				//	//method.InvokeOptimized(null, type);
+				//}
+				//else if(type.IsCastableTo(typeof(ComponentSystemBase))) {
+				//	//postAction += () => TypeManager.GetSystemTypeIndex(type);
+				//	//var method = typeof(TypeManager).GetMemberCached("AddSystemTypeToTablesAfterInit") as MethodInfo;
+				//	//method.InvokeOptimized(null, type);
+				//}
+				//else if(type.IsCastableTo(typeof(IComponentData))) {
+				//	//postAction += () => TypeManager.GetTypeIndex(type);
+				//	//Debug.Log("ComponentType () => " + type.FullName);
+				//	//var method = typeof(TypeManager).GetMemberCached("GetOrCreateTypeIndex") as MethodInfo;
+				//	//method.InvokeOptimized(null, type);
+				//}
 			}
+
+			TypeManager.Shutdown();
+			TypeManager.Initialize();
+
+//#if !DISABLE_TYPEMANAGER_ILPP
+//			//postAction += static () => {
+//			//};
+//			try {
+//				var method = typeof(TypeManager).GetMemberCached("RegisterStaticAssemblyTypes") as MethodInfo;
+//				var asm = new Assembly[] { loadedAssembly };
+//				method.InvokeOptimized(null, asm, new HashSet<Type>(), new List<Type>());
+//				method = typeof(TypeManager).GetMemberCached("InitializeSystemSharedStatics") as MethodInfo;
+//				method.InvokeOptimized(null);
+//			}
+//			catch(Exception ex) {
+//				Debug.LogException(ex);
+//			}
+//#endif
 			postAction();
+			postAction = null;
 
 			EarlyInitHelpers.FlushEarlyInits();
-
 			SystemBaseRegistry.InitializePendingTypes();
 
-			//var method = typeof(TypeManager).GetMemberCached("RegisterStaticAssemblyTypes") as MethodInfo;
-			//HashSet<Type> hash = new();
-			//method.InvokeOptimized(null, new Assembly[] { loadedAssembly }, hash, null);
-			//method = typeof(TypeManager).GetMemberCached("InitializeSystemSharedStatics") as MethodInfo;
-			//method.InvokeOptimized(null);
 			Debug.Log("Loaded system assembly: " + loadedAssembly.FullName);
 		}
 
-		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
 		static void InitializeOnPlay() {
 			if(loadedAssembly == null) {
 				var path = SystemCompiler.OutputPath + ".dll";
@@ -121,7 +144,13 @@ namespace MaxyGames.UNode.Editors {
 			postAction?.Invoke();
 			postAction = null;
 
-			InjectSystems();
+			if(SystemHotReloadWindow.AutoInject) {
+				InjectSystems();
+			}
+
+			if(loadedAssembly != null) {
+				ReflectionUtils.RegisterRuntimeAssembly(loadedAssembly);
+			}
 		}
 
 		public static void InjectSystems(bool log = true) {
@@ -189,13 +218,13 @@ namespace MaxyGames.UNode.Editors {
 				if(list.Count > 0) {
 					DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, list);
 
-					Debug.Log($"Injected {list.Count} systems from ECS Graphs.\n" + string.Join('\n', list.Select(item => item.IsValueType ?
+					Debug.Log($"Injected {list.Count} systems.\n" + string.Join('\n', list.Select(item => item.IsValueType ?
 						$"ISystem => {item.PrettyName(true)}" :
 						$"SystemBase => {item.PrettyName(true)}")));
 				}
 			}
-			catch {
-				Debug.LogError("Error on injecting system, possible because of TypeManager. Try add `DISABLE_TYPEMANAGER_ILPP` define symbol.");
+			catch (Exception ex) {
+				Debug.LogException(new Exception("Error on injecting system, possible because of unknow error try Reload Domain or it is because of TypeManager. Try add `DISABLE_TYPEMANAGER_ILPP` define symbol.", ex));
 				throw;
 			}
 			finally {

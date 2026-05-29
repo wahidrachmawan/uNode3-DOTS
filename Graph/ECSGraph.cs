@@ -242,6 +242,11 @@ namespace MaxyGames.UNode {
 					}
 					classData.implementedInterfaces.Add(typeof(ISystem));
 				}
+#if UNITY_EDITOR
+				if(UnityEditor.BuildPipeline.isBuildingPlayer == false) {
+					classData.RegisterAttribute(typeof(DisableAutoCreationAttribute));
+				}
+#endif
 
 				//if(requiredForUpdates.Count > 0) {
 				//	//Add RequireMatchingQueriesForUpdate attribute if there's any required for updates

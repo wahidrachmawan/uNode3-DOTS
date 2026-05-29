@@ -7,7 +7,7 @@ using Unity.Burst;
 using Unity.Entities;
 
 namespace MaxyGames.UNode {
-	public abstract class BaseJobContainer : NodeContainerWithEntry, IEventGraphCanvas, INodeEntitiesForeach {
+	public abstract class BaseJobContainer : NodeContainerWithEntry, INodeEntitiesForeach {
 		[Serializable]
 		public class VData {
 			public string id = uNodeUtility.GenerateUID();
@@ -39,9 +39,7 @@ namespace MaxyGames.UNode {
 			}
 		}
 
-		public virtual string Title => name;
-
-		public string Scope => "ECS_Job" + NodeScope.OR + NodeScope.FlowGraph;
+		public override string SupportedScope => "ECS_Job" + NodeScope.OR + NodeScope.FlowGraph;
 
 		public virtual ECSLogicExecutionMode LogicExecutionMode => executionMode;
 

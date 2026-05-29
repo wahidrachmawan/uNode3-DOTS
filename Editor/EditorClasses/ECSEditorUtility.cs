@@ -5,9 +5,12 @@ using System.Linq;
 using System.Collections.Generic;
 using Unity.Entities;
 using MaxyGames.UNode.Nodes;
+using System.Runtime.CompilerServices;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace MaxyGames.UNode.Editors {
-    public static class ECSEditorUtility {
+	public static class ECSEditorUtility {
 		public static ClassScript CreateAspect(ScriptGraph scriptGraph, ClassScript component) {
 			var authoringGraph = ScriptableObject.CreateInstance<ClassScript>();
 			{
@@ -60,7 +63,7 @@ namespace MaxyGames.UNode.Editors {
 										new[]{
 											typeof(Entity),
 											Type.MakeGenericMethodParameter(0).MakeByRefType() }
-										), 
+										),
 									componentType)
 								);
 							addComponent.parameters[0].input.ConnectToAsProxy(entity.output);
@@ -119,5 +122,129 @@ namespace MaxyGames.UNode.Editors {
 
 		//For reference only
 		abstract class Baker : Baker<GraphComponent> { }
+	}
+
+	public static class BlittableTypeChecker {
+		/// <summary>
+		/// Cache for reflection-based blittable checks.
+		/// </summary>
+		private static readonly Dictionary<Type, bool> _blittableCache = new Dictionary<Type, bool>();
+
+		/// <summary>
+		/// Primitive blittable types.
+		/// </summary>
+		private static readonly HashSet<Type> PrimitiveBlittableTypes = new HashSet<Type> {
+			typeof(bool),//is not blittable but unity support it
+			typeof(byte),
+			typeof(sbyte),
+			typeof(short),
+			typeof(ushort),
+			typeof(int),
+			typeof(uint),
+			typeof(long),
+			typeof(ulong),
+			typeof(float),
+			typeof(double),
+			typeof(IntPtr),
+			typeof(UIntPtr)
+		};
+
+		/// <summary>
+		/// Compile-time generic blittable check.
+		///
+		/// Uses RuntimeHelpers.IsReferenceOrContainsReferences<T>()
+		/// which is fast and works well for unmanaged validation.
+		///
+		/// Returns true if T contains no managed references.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static bool IsBlittable<T>() {
+			try {
+				return !RuntimeHelpers.IsReferenceOrContainsReferences<T>();
+			}
+			catch(Exception ex) {
+				UnityEngine.Debug.LogError(
+					$"Blittable check failed for {typeof(T)}\n{ex}");
+
+				return false;
+			}
+		}
+
+		/// <summary>
+		/// Reflection-based runtime blittable check.
+		/// </summary>
+		public static bool IsBlittable(Type type) {
+			if(type == null)
+				throw new ArgumentNullException(nameof(type));
+
+			if(_blittableCache.TryGetValue(type, out bool cached))
+				return cached;
+			var visited = StaticHashPool<Type>.Allocate();
+			bool result = InternalIsBlittable(type, visited);
+			StaticHashPool.Free(visited);
+
+			_blittableCache[type] = result;
+
+			return result;
+		}
+
+		/// <summary>
+		/// Internal recursive blittable validation.
+		/// </summary>
+		private static bool InternalIsBlittable(Type type, HashSet<Type> visited) {
+			// Primitive blittable types.
+			if(PrimitiveBlittableTypes.Contains(type))
+				return true;
+
+			// Enums are blittable if underlying type is blittable.
+			if(type.IsEnum) {
+				return IsBlittable(Enum.GetUnderlyingType(type));
+			}
+
+			// Pointer types are blittable.
+			if(type.IsPointer)
+				return true;
+
+			// Reject managed/reference types.
+			if(!type.IsValueType)
+				return false;
+
+			// Explicitly reject common problematic types.
+			if(type == typeof(bool))
+				return false;
+
+			if(type == typeof(char))
+				return false;
+
+			if(type == typeof(decimal))
+				return false;
+
+			if(visited.Add(type)) {
+				return false;
+			}
+
+			// Validate all instance fields recursively.
+			FieldInfo[] fields = type.GetFields(
+				BindingFlags.Instance |
+				BindingFlags.Public |
+				BindingFlags.NonPublic);
+
+			foreach(FieldInfo field in fields) {
+				Type fieldType = field.FieldType;
+
+				if(!InternalIsBlittable(fieldType, visited))
+					return false;
+			}
+
+			// Marshal.SizeOf throws if not blittable in many cases.
+			try {
+				Marshal.SizeOf(type);
+			}
+			catch {
+				return false;
+			}
+
+			return true;
+		}
 	}
 }

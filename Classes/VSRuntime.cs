@@ -75,7 +75,6 @@ namespace MaxyGames.UNode {
 	#endregion
 
 	#region RUNTIME
-
 	public static unsafe class VSRuntime {
 		static NativeRingBuffer[] buffers;
 		static int writeIdx;

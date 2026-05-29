@@ -97,6 +97,7 @@ namespace MaxyGames.UNode {
 		//Custom,
 	}
 
+	[Serializable]
 	public struct DefaultCommandBufferData {
 		public DefaultCommandBufferType kind;
 		//[Filter(typeof(EntityCommandBufferSystem))]
@@ -194,6 +195,24 @@ namespace MaxyGames.UNode {
 		public object userData;
 	}
 
+	public static class ECSRuntimeUtility {
+		/// <summary>
+		/// The last loaded assembly.
+		/// </summary>
+		public static Assembly loadedAssembly;
+
+		public static Type GetRuntimeType(string typeName, bool throwException = true) {
+			if(loadedAssembly != null) {
+				var result = loadedAssembly.GetType(typeName);
+				if(result == null && throwException) {
+					throw new Exception($"Couldn't find type: {typeName}");
+				}
+				return result;
+			}
+			return typeName.ToType(throwException);
+		}
+	}
+
 	public static class ECSGraphUtility {
 		/// <summary>
 		/// Retrieves or creates a unique name for the EntityManager associated with the specified node object during code
@@ -232,7 +251,7 @@ namespace MaxyGames.UNode {
 					CG.RegisterUserObject(result, (owner, "LocalVars", type));
 
 					CG.RegisterPostClassManipulator(data => {
-						data.AddVariable(new CG.VData(result, type, autoCorrection: false));
+						data.AddVariable(new CG.VData(result, type));
 
 						var mdata = data.GetMethodData(nameof(ISystem.OnUpdate));
 						if(mdata == null)
@@ -255,7 +274,7 @@ namespace MaxyGames.UNode {
 					CG.RegisterUserObject(result, (owner, "Vars", type));
 
 					CG.RegisterPostClassManipulator(data => {
-						data.AddVariable(new CG.VData(result, type, autoCorrection: false));
+						data.AddVariable(new CG.VData(result, type));
 
 						var mdata = data.GetMethodData(nameof(ISystem.OnCreate));
 						if(mdata == null)

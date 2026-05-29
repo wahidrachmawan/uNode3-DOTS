@@ -194,7 +194,7 @@ namespace MaxyGames.UNode.Editors {
 				EditorGUILayout.HelpBox("This graph is still not compiled.\n[Click to Compile]", MessageType.Info);
 				EditorGUILayout.EndVertical();
 				if(Event.current.clickCount == 1 && Event.current.button == 0 && boxRect.Contains(Event.current.mousePosition)) {
-					GraphUtility.SaveAllGraph();
+					GraphEditorUtility.SaveAllGraph();
 					SystemCompiler.GenerateAndCompileGraphs();
 					Event.current.Use();
 				}
@@ -207,7 +207,7 @@ namespace MaxyGames.UNode.Editors {
 				EditorGUILayout.HelpBox("This graph is Run using Native C# but script is outdated.\n[Click To Recompile]", MessageType.Warning);
 				EditorGUILayout.EndVertical();
 				if(Event.current.clickCount == 1 && Event.current.button == 0 && boxRect.Contains(Event.current.mousePosition)) {
-					GraphUtility.SaveAllGraph();
+					GraphEditorUtility.SaveAllGraph();
 					SystemCompiler.GenerateAndCompileGraphs();
 					Event.current.Use();
 				}
