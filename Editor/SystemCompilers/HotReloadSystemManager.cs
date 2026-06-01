@@ -41,15 +41,24 @@ namespace MaxyGames.UNode.Editors {
 			set => ECSRuntimeUtility.loadedAssembly = value;
 		}
 		private static List<SystemData> allActiveSystems = new();
-		private static Action postAction;
 
-		public static void LoadCompiledAssembly(string path) {
+		public static void EnsureLoadCompiledAssembly() {
+			if(loadedAssembly == null) {
+				LoadCompiledAssembly();
+			}
+		}
+
+		public static void LoadCompiledAssembly() {
+			LoadCompiledAssembly(SystemCompiler.OutputDllPath);
+		}
+
+		private static void LoadCompiledAssembly(string path) {
 			if(!File.Exists(path)) {
 				Debug.LogWarning("DLL not found: " + path);
 				return;
 			}
 			//For make sure only process post action for last compiled assembly
-			postAction = null;
+			Action postAction = null;
 			//if(m_oldRegistration == null) {
 			//	var type = typeof(SystemBaseRegistry).GetNestedType("Managed", MemberData.flags);
 			//	m_oldRegistration = SerializerUtility.Duplicate(type.GetFieldCached("s_PendingRegistrations").GetValue(null));
@@ -115,7 +124,6 @@ namespace MaxyGames.UNode.Editors {
 //			}
 //#endif
 			postAction();
-			postAction = null;
 
 			EarlyInitHelpers.FlushEarlyInits();
 			SystemBaseRegistry.InitializePendingTypes();
@@ -123,26 +131,29 @@ namespace MaxyGames.UNode.Editors {
 			Debug.Log("Loaded system assembly: " + loadedAssembly.FullName);
 		}
 
-		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-		static void InitializeOnPlay() {
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+		static void FirstInitializeOnPlay() {
 			if(loadedAssembly == null) {
-				var path = SystemCompiler.OutputPath + ".dll";
-				if(File.Exists(path)) {
-					LoadCompiledAssembly(path);
+				var path = SystemCompiler.OutputDllPath;
+				if(File.Exists(path) && SystemHotReloadWindow.AutoInject) {
+					LoadCompiledAssembly();
 				}
 				else {
 					//Skip if no compiled assembly found, which can happen when entering play mode before any graph is compiled. Systems will be injected when the some graph is compiled and loaded.
 					return;
 				}
 			}
+		}
 
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+		static void InitializeOnPlay() {
 			allActiveSystems.Clear();
 			ActiveSystemNames.Clear();
 
 			//TypeManager.Shutdown();
 			//TypeManager.Initialize();
-			postAction?.Invoke();
-			postAction = null;
+			//postAction?.Invoke();
+			//postAction = null;
 
 			if(SystemHotReloadWindow.AutoInject) {
 				InjectSystems();

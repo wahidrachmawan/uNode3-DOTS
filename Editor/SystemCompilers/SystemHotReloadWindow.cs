@@ -37,6 +37,7 @@ namespace MaxyGames.UNode.Editors {
 
 			root.Add(compileButton);
 			root.Add(new Button(() => {
+				HotReloadSystemManager.EnsureLoadCompiledAssembly();
 				HotReloadSystemManager.InjectSystems();
 				listView.RefreshItems();
 			}) { text = "Inject Systems (Manual)" });

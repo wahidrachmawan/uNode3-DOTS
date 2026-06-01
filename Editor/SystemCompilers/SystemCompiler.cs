@@ -128,7 +128,8 @@ namespace MaxyGames.UNode.Editors {
 
 					Debug.Log("Compiled to: " + OutputPath);
 
-					HotReloadSystemManager.LoadCompiledAssembly(OutputDllPath);
+					//if(Application.isPlaying)
+						HotReloadSystemManager.LoadCompiledAssembly();
 					
 					callback?.Invoke(true);
 
@@ -190,6 +191,10 @@ namespace MaxyGames.UNode.Editors {
 					}, static () => { });
 
 					Debug.Log("Starting compiling graphs...");
+
+					var stopwatch = new System.Diagnostics.Stopwatch();
+					stopwatch.Start();
+
 					RoslynCodeCompiler.Run(option, result => {
 						try {
 							progresFinish = true;
@@ -200,10 +205,11 @@ namespace MaxyGames.UNode.Editors {
 									File.Copy(dllPath, OutputDllPath, true);
 									File.Copy(pdbPath, OutputPdbPath, true);
 
-									Debug.Log("Compiled to: " + OutputPath);
+									Debug.Log("Compile took: " + stopwatch.ElapsedMilliseconds + " ms" + $"\nCompiled to: {OutputPath}");
 
 									uNodeThreadUtility.Queue(() => {
-										HotReloadSystemManager.LoadCompiledAssembly(OutputDllPath);
+										//if(Application.isPlaying)
+											HotReloadSystemManager.LoadCompiledAssembly();
 
 										callback?.Invoke(true);
 
