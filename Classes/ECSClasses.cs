@@ -203,6 +203,12 @@ namespace MaxyGames.UNode {
 
 		public static Type GetRuntimeType(string typeName, bool throwException = true) {
 			if(loadedAssembly != null) {
+				if(string.IsNullOrEmpty(typeName)) {
+					if(throwException) {
+						throw new ArgumentNullException(nameof(typeName));
+					}
+					return null;
+				}
 				var result = loadedAssembly.GetType(typeName);
 				if(result == null && throwException) {
 					throw new Exception($"Couldn't find type: {typeName}");

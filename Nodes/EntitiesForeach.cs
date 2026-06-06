@@ -530,14 +530,14 @@ namespace MaxyGames.UNode.Editors {
 					}
 					position.y += EditorGUIUtility.singleLineHeight + 1;
 					if(value.kind == Nodes.EntitiesForeach.DataKind.ReadOnlyComponent || value.kind == Nodes.EntitiesForeach.DataKind.ReadWriteComponent) {
-						uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Component Type"), type => {
+						uNodeGUIUtility.EditType(position, value.type, new GUIContent("Component Type"), type => {
 							value.type = type;
 							node.Register();
 							uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
 						}, componentFilter, option.unityObject);
 					}
 					else {
-						uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Component Type"), type => {
+						uNodeGUIUtility.EditType(position, value.type, new GUIContent("Component Type"), type => {
 							value.type = type;
 							node.Register();
 							uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
@@ -581,7 +581,7 @@ namespace MaxyGames.UNode.Editors {
 						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
 					}
 					position.y += EditorGUIUtility.singleLineHeight + 1;
-					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Component Type"), type => {
+					uNodeGUIUtility.EditType(position, value.type, new GUIContent("Component Type"), type => {
 						value.type = type;
 						node.Register();
 						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);

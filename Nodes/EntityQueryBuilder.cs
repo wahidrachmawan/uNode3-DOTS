@@ -81,7 +81,7 @@ namespace MaxyGames.UNode.Editors {
 						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);
 					}
 					position.y += EditorGUIUtility.singleLineHeight + 1;
-					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Component Type"), type => {
+					uNodeGUIUtility.EditType(position, value.type, new GUIContent("Component Type"), type => {
 						value.type = type;
 						node.Register();
 						uNodeGUIUtility.GUIChanged(node, UIChangeType.Average);

@@ -90,7 +90,7 @@ namespace MaxyGames.UNode.Editors {
 					position.height = EditorGUIUtility.singleLineHeight;
 					value.name = EditorGUI.TextField(position, "Name", value.name);
 					position.y += EditorGUIUtility.singleLineHeight + 1;
-					uNodeGUIUtility.DrawTypeDrawer(position, value.type, new GUIContent("Type"), type => {
+					uNodeGUIUtility.EditType(position, value.type, new GUIContent("Type"), type => {
 						value.type = type;
 					}, FilterAttribute.DefaultTypeFilter);
 				},
